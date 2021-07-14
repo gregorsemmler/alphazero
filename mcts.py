@@ -31,7 +31,7 @@ class MCTS(object):
 
     def traverse_and_backup(self, count, state, player):
         backup_queue = []  # TODO rename?
-        planned = set()  # TODO specific state class
+        planned = set()  # TODO specific state class?
         expand_queue = []
 
         for _ in range(count):
@@ -68,9 +68,6 @@ class MCTS(object):
                 self.w[state_int][action] += cur_value
                 self.q[state_int][action] = self.w[state_int][action] / self.n[state_int][action]
                 cur_value = -cur_value
-
-            # TODO
-            pass
 
     def traverse(self, state, player):
         states = []
