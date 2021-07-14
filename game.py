@@ -23,9 +23,6 @@ class Game(object):
     def move(self, state, action, player):
         raise NotImplementedError()
 
-    def is_draw(self, state):
-        raise NotImplementedError()
-
     def render(self, state):
         raise NotImplementedError()
 
@@ -61,10 +58,10 @@ class ConnectNGame(Game):
         column = res_state[:, action]
         row_idx = column[np.where(column == Player.NO_PLAYER.value)][0].max()
         column[row_idx] = player.value
-        # TODO
-        pass
 
-    def would_win(self, ar, row_idx, col_idx, player):
+        return res_state, self.win_at_pos(res_state, row_idx, action, player)
+
+    def win_at_pos(self, ar, row_idx, col_idx, player):
         if ar.shape != (self.n_rows, self.n_cols):
             raise ValueError("State is in incorrect shape")
 

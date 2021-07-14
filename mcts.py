@@ -101,7 +101,8 @@ class MCTS(object):
             cur_state, won = self.game.move(cur_state, cur_action, cur_player)  # TODO refactor?
             if won:
                 value = -1.0
-            elif self.game.is_draw(cur_state):
+            elif len(self.game.valid_actions(cur_state)) == 0:
+                # Draw
                 value = 0.0
 
             cur_player = 1 if cur_player == 0 else 1  # TODO refactor?
