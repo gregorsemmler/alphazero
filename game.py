@@ -69,16 +69,16 @@ class ConnectNGame(Game):
             raise ValueError("State is in incorrect shape")
 
         # vertical
-        if self.n_rows - row_idx >= self.count_to_win:
-            vert_line: np.ndarray = ar[row_idx: row_idx + self.count_to_win, col_idx]
+        start_row_idx = max(0, row_idx - self.count_to_win + 1)
+        end_row_idx = min(self.n_rows - self.count_to_win + 1, row_idx + 1)
+
+        for r_idx in range(start_row_idx, end_row_idx):
+            vert_line: np.ndarray = ar[r_idx: r_idx + self.count_to_win, col_idx]
             if (vert_line == player.value).all():
                 return True
 
         start_col_idx = max(0, col_idx-self.count_to_win+1)
         end_col_idx = min(self.n_cols - self.count_to_win + 1, col_idx + 1)
-        start_row_idx = max(0, row_idx-self.count_to_win+1)
-        end_row_idx = min(self.n_rows - self.count_to_win + 1, row_idx + 1)
-
         for c_idx in range(start_col_idx, end_col_idx):
             # horizontal
             row: np.ndarray = ar[row_idx, c_idx: c_idx + self.count_to_win]
@@ -90,8 +90,6 @@ class ConnectNGame(Game):
         move_lower = min(self.n_rows - row_idx - 1, self.n_cols - col_idx - 1, self.count_to_win - 1)
 
         for off1 in range(-1 * move_upper, move_lower - (self.count_to_win - 1) + 1):
-            # TODO
-            # print([(row_idx + off1 + i, col_idx + off1 + i) for i in range(self.count_to_win)])
             d = np.array([ar[row_idx + off1 + i, col_idx + off1 + i] for i in range(self.count_to_win)])
             if (d == player.value).all():
                 return True
@@ -100,11 +98,8 @@ class ConnectNGame(Game):
         move_upper2 = min(self.n_cols - col_idx - 1, row_idx, self.count_to_win - 1)
         move_lower2 = min(col_idx, self.n_rows - row_idx - 1, self.count_to_win - 1)
 
-        for off2 in range(-1 * move_lower2, move_upper2 - (self.count_to_win - 1)):
-            # TODO
-            # print([(row_idx + (-1) * off2 + (-1) * i, col_idx + off2 + i) for i in range(self.count_to_win)])
+        for off2 in range(-1 * move_lower2, move_upper2 - (self.count_to_win - 1) + 1):
             d = np.array([ar[row_idx + (-1) * off2 + (-1) * i, col_idx + off2 + i] for i in range(self.count_to_win)])
-
             if (d == player.value).all():
                 return True
 

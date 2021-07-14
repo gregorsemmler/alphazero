@@ -21,20 +21,50 @@ def test_would_win():
             for c_idx in range(n_cols):
                 state = g.initial_state()
                 state[r_idx: r_idx+n_to_win, c_idx] = player.value
-                assert g.would_win(state, r_idx, c_idx, player)
+
+                for r in range(n_rows):
+                    for c in range(n_cols):
+                        if state[r, c] == player.value:
+                            assert g.would_win(state, r, c, player)
+                        else:
+                            assert not g.would_win(state, r, c, player)
 
         # Horizontal
         for r_idx in range(n_rows):
             for c_idx in range(n_cols - n_to_win + 1):
                 state = g.initial_state()
                 state[r_idx, c_idx: c_idx + n_to_win] = player.value
-                assert g.would_win(state, r_idx, c_idx, player)
+
+                for r in range(n_rows):
+                    for c in range(n_cols):
+                        if state[r, c] == player.value:
+                            assert g.would_win(state, r, c, player)
+                        else:
+                            assert not g.would_win(state, r, c, player)
 
         # Diagonal
         for r_idx in range(n_rows - n_to_win + 1):
             for c_idx in range(n_cols - n_to_win + 1):
-                pass
-                # TODO
-                # state = g.initial_state()
-                # state[r_idx: r_idx+n_to_win, c_idx] = player.value
-                # assert g.would_win(state, r_idx, c_idx, player)
+                state = g.initial_state()
+                for o in range(n_to_win):
+                    state[r_idx+o, c_idx+o] = player.value
+
+                for r in range(n_rows):
+                    for c in range(n_cols):
+                        if state[r, c] == player.value:
+                            assert g.would_win(state, r, c, player)
+                        else:
+                            assert not g.would_win(state, r, c, player)
+
+        for r_idx in range(n_to_win - 1, n_rows):
+            for c_idx in range(n_cols - n_to_win + 1):
+                state = g.initial_state()
+                for o in range(n_to_win):
+                    state[r_idx-o, c_idx+o] = player.value
+
+                for r in range(n_rows):
+                    for c in range(n_cols):
+                        if state[r, c] == player.value:
+                            assert g.would_win(state, r, c, player)
+                        else:
+                            assert not g.would_win(state, r, c, player)
