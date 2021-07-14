@@ -4,11 +4,15 @@ import numpy as np
 
 
 class Player(Enum):
-    FIRST_PLAYER = 0
-    SECOND_PLAYER = 1
+    NO_PLAYER = 0
+    FIRST_PLAYER = 1
+    SECOND_PLAYER = 2
 
 
 class Game(object):
+
+    def initial_state(self):
+        raise NotImplementedError()
 
     def valid_actions(self, state):
         raise NotImplementedError()
@@ -26,22 +30,27 @@ class Game(object):
         raise NotImplementedError()
 
 
-class Connect4Game(Game):
+class ConnectNGame(Game):
 
-    def __init__(self, num_rows=6, num_cols=7, count_to_win=4):
+    def __init__(self, n_rows=6, n_cols=7, count_to_win=4):
         super().__init__()
-        self.num_rows = num_rows
-        self.num_cols = num_cols
+        self.n_rows = n_rows
+        self.n_cols = n_cols
         self.count_to_win = count_to_win
-        if self.count_to_win > self.num_rows or self.count_to_win > self.num_cols:
+        if self.count_to_win > self.n_rows or self.count_to_win > self.n_cols:
             raise ValueError("Board dimensions are too small to allow win.")
 
+    def initial_state(self):
+        s = np.zeros((self.n_rows, self.n_cols))
+        s[:, :] = Player.NO_PLAYER.value
+        return s
+
     def valid_actions(self, state):
-        is_valid = state[0] == 0.0
+        is_valid = state[0] == Player.NO_PLAYER.value
         return {idx for idx in range(len(is_valid)) if is_valid[idx]}
 
     def invalid_actions(self, state):
-        is_valid = state[0] == 0.0
+        is_valid = state[0] == Player.NO_PLAYER.value
         return {idx for idx in range(len(is_valid)) if not is_valid[idx]}
 
     def move(self, state, action, player):
@@ -50,53 +59,70 @@ class Connect4Game(Game):
 
         res_state = state.copy()
         column = res_state[:, action]
-        row_idx = column[np.where(column == 0.0)][0].max()
+        row_idx = column[np.where(column == Player.NO_PLAYER.value)][0].max()
         column[row_idx] = player.value
         # TODO
         pass
 
-    def would_win(self, new_state, row_idx, col_idx, player):
-        if new_state.shape != (self.num_rows, self.num_cols):
+    def would_win(self, ar, row_idx, col_idx, player):
+        if ar.shape != (self.n_rows, self.n_cols):
             raise ValueError("State is in incorrect shape")
 
         # vertical
-        if self.num_rows - row_idx > self.count_to_win:
-            vert_line: np.ndarray = new_state[row_idx: row_idx+self.count_to_win, col_idx]
+        if self.n_rows - row_idx >= self.count_to_win:
+            vert_line: np.ndarray = ar[row_idx: row_idx + self.count_to_win, col_idx]
             if (vert_line == player.value).all():
                 return True
 
         start_col_idx = max(0, col_idx-self.count_to_win+1)
-        end_col_idx = min(self.num_cols-self.count_to_win+1, col_idx+1)
+        end_col_idx = min(self.n_cols - self.count_to_win + 1, col_idx + 1)
         start_row_idx = max(0, row_idx-self.count_to_win+1)
-        end_row_idx = min(self.num_rows-self.count_to_win+1, row_idx+1)
+        end_row_idx = min(self.n_rows - self.count_to_win + 1, row_idx + 1)
 
         for c_idx in range(start_col_idx, end_col_idx):
             # horizontal
-            row: np.ndarray = new_state[row_idx, c_idx: c_idx+self.count_to_win]
+            row: np.ndarray = ar[row_idx, c_idx: c_idx + self.count_to_win]
             if (row == player.value).all():
                 return True
 
-        # diagonal
-        for r_idx, c_idx in zip(range(start_row_idx, end_row_idx), range(start_col_idx, end_col_idx)):
-            line1 = [new_state[r_idx+a_idx, c_idx+a_idx] for a_idx in range(self.count_to_win)]
-            if all([el == player.value for el in line1]):
+        # Diagonal 1
+        move_upper = min(row_idx, col_idx, self.count_to_win - 1)
+        move_lower = min(self.n_rows - row_idx - 1, self.n_cols - col_idx - 1, self.count_to_win - 1)
+
+        for off1 in range(-1 * move_upper, move_lower - (self.count_to_win - 1) + 1):
+            # TODO
+            # print([(row_idx + off1 + i, col_idx + off1 + i) for i in range(self.count_to_win)])
+            d = np.array([ar[row_idx + off1 + i, col_idx + off1 + i] for i in range(self.count_to_win)])
+            if (d == player.value).all():
                 return True
 
-        pass
+        # Diagonal 2
+        move_upper2 = min(self.n_cols - col_idx - 1, row_idx, self.count_to_win - 1)
+        move_lower2 = min(col_idx, self.n_rows - row_idx - 1, self.count_to_win - 1)
+
+        for off2 in range(-1 * move_lower2, move_upper2 - (self.count_to_win - 1)):
+            # TODO
+            # print([(row_idx + (-1) * off2 + (-1) * i, col_idx + off2 + i) for i in range(self.count_to_win)])
+            d = np.array([ar[row_idx + (-1) * off2 + (-1) * i, col_idx + off2 + i] for i in range(self.count_to_win)])
+
+            if (d == player.value).all():
+                return True
+
+        return False
 
     def state_to_string(self, state):
-        index_line = "".join([str(el) for el in range(self.num_cols)])
-        sep_line = "-" * self.num_cols
+        index_line = "".join([str(el) for el in range(self.n_cols)])
+        sep_line = "-" * self.n_cols
         lines = [index_line, sep_line]
 
         def val_to_char(val):
-            if val == 1.0:
+            if val == Player.FIRST_PLAYER.value:
                 return "O"
-            if val == -1.0:
+            if val == Player.SECOND_PLAYER.value:
                 return "X"
             return " "
 
-        for i_row in range(self.num_rows):
+        for i_row in range(self.n_rows):
             line = "".join([val_to_char(el) for el in state[i_row]])
             lines.append(line)
 
