@@ -3,6 +3,8 @@ from math import sqrt
 import numpy as np
 import torch
 
+from game import Player
+
 
 class MCTS(object):
 
@@ -20,6 +22,53 @@ class MCTS(object):
         self.q = {}
         self.p = {}
         self.device = torch.device(device_token)
+
+    def play_match(self, other_mcts, num_mcts_searches, tau_func, first_player=None, replay_buffer=None):
+        if type(self.game) is not type(other_mcts):
+            raise RuntimeError("Other MCTS object has game of different type")
+
+        def switch_player(p):
+            return Player.FIRST_PLAYER if p == Player.SECOND_PLAYER else Player.SECOND_PLAYER
+
+        state = self.game.initial_state()
+        first_player = first_player if first_player is not None else np.random.choice(
+            [Player.FIRST_PLAYER, Player.SECOND_PLAYER])
+        other_player = switch_player(first_player)
+        player = first_player
+        step_idx = 0
+        game_history = []
+
+        mcts_d = {first_player: self, other_player: other_mcts}
+        first_player_result = None
+
+        while True:
+            tau = tau_func(step_idx)
+            m: MCTS = mcts_d[player]
+            m.traversals_and_backups(num_mcts_searches, state, player)
+            probs = m.policy_value(state, tau)
+            game_history.append((state, player, probs))
+            action = np.random.choice(self.num_actions, p=probs)
+            if action in m.game.invalid_actions():
+                raise RuntimeError("Impossible Action selected")
+            state, won = m.game.move(state, action, player)
+
+            if won:
+                final_result = 1
+                first_player_result = final_result if player == first_player else (-1) * final_result
+                break
+            if len(m.game.valid_actions(state)) == 0:
+                # draw
+                final_result = 0
+                break
+
+            player = switch_player(player)
+            step_idx += 1
+
+        if replay_buffer is not None:
+            for s, p, pr in game_history:
+                replay_buffer.append((s, p, pr, final_result if p == player else (-1) * final_result))
+
+        return first_player_result, step_idx
 
     def is_leaf_state(self, state):
         return state in self.p
