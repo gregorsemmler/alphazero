@@ -40,6 +40,7 @@ class MCTS(object):
 
         mcts_d = {first_player: self, other_player: other_mcts}
         first_player_result = None
+        final_result = None
 
         while True:
             tau = tau_func(step_idx)
@@ -55,10 +56,12 @@ class MCTS(object):
             if won:
                 final_result = 1
                 first_player_result = final_result if player == first_player else (-1) * final_result
-                break
-            if len(m.game.valid_actions(state)) == 0:
+            elif len(m.game.valid_actions(state)) == 0:
                 # draw
                 final_result = 0
+                first_player_result = final_result
+
+            if final_result is not None:
                 break
 
             player = switch_player(player)
