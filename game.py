@@ -33,6 +33,7 @@ class ConnectNGame(Game):
         super().__init__()
         self.n_rows = n_rows
         self.n_cols = n_cols
+        self.n_actions = n_cols
         self.count_to_win = count_to_win
         if self.count_to_win > self.n_rows or self.count_to_win > self.n_cols:
             raise ValueError("Board dimensions are too small to allow win.")
