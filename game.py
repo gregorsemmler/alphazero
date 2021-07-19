@@ -56,7 +56,7 @@ class ConnectNGame(Game):
 
         res_state = state.copy()
         column = res_state[:, action]
-        row_idx = column[np.where(column == Player.NO_PLAYER.value)][0].max()
+        row_idx = np.where(column == Player.NO_PLAYER.value)[0].max()
         column[row_idx] = player.value
 
         return res_state, self.win_at_pos(res_state, row_idx, action, player)

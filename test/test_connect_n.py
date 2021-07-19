@@ -1,13 +1,71 @@
 import numpy as np
+import pytest
 
 from game import ConnectNGame, Player
+
+
+def test_move():
+    n_rows, n_cols, n_to_win = 6, 7, 4
+    g = ConnectNGame(n_rows, n_cols, n_to_win)
+
+    def other_player(p):
+        return Player.FIRST_PLAYER if p == Player.SECOND_PLAYER else Player.SECOND_PLAYER
+
+    player = Player.FIRST_PLAYER
+    state = g.initial_state()
+    action_list = [0, 1, 3, 5, 6, 2, 6, 1, 6, 1, 4, 4]
+    # g.render(state)
+    for action in action_list:
+        state, won = g.move(state, action, player)
+        # g.render(state)
+        assert not won
+        player = other_player(player)
+
+    exp = np.array([[Player.NO_PLAYER.value, Player.NO_PLAYER.value, Player.NO_PLAYER.value, Player.NO_PLAYER.value,
+                     Player.NO_PLAYER.value, Player.NO_PLAYER.value, Player.NO_PLAYER.value],
+                    [Player.NO_PLAYER.value, Player.NO_PLAYER.value, Player.NO_PLAYER.value, Player.NO_PLAYER.value,
+                     Player.NO_PLAYER.value, Player.NO_PLAYER.value, Player.NO_PLAYER.value],
+                    [Player.NO_PLAYER.value, Player.NO_PLAYER.value, Player.NO_PLAYER.value, Player.NO_PLAYER.value,
+                     Player.NO_PLAYER.value, Player.NO_PLAYER.value, Player.NO_PLAYER.value],
+                    [Player.NO_PLAYER.value, Player.SECOND_PLAYER.value, Player.NO_PLAYER.value, Player.NO_PLAYER.value,
+                     Player.NO_PLAYER.value, Player.NO_PLAYER.value, Player.FIRST_PLAYER.value],
+                    [Player.NO_PLAYER.value, Player.SECOND_PLAYER.value, Player.NO_PLAYER.value, Player.NO_PLAYER.value,
+                     Player.SECOND_PLAYER.value, Player.NO_PLAYER.value, Player.FIRST_PLAYER.value],
+                    [Player.FIRST_PLAYER.value, Player.SECOND_PLAYER.value, Player.SECOND_PLAYER.value,
+                     Player.FIRST_PLAYER.value, Player.FIRST_PLAYER.value, Player.SECOND_PLAYER.value,
+                     Player.FIRST_PLAYER.value]])
+
+    assert (state == exp).all()
+
+    state, won = g.move(state, 6, player)
+    assert won
+
+
+def test_invalid_move():
+    n_rows, n_cols, n_to_win = 6, 7, 4
+    g = ConnectNGame(n_rows, n_cols, n_to_win)
+
+    def other_player(p):
+        return Player.FIRST_PLAYER if p == Player.SECOND_PLAYER else Player.SECOND_PLAYER
+
+    player = Player.FIRST_PLAYER
+    state = g.initial_state()
+    action_list = [0, 0, 0, 0, 0, 0]
+    # g.render(state)
+    for action in action_list:
+        state, won = g.move(state, action, player)
+        # g.render(state)
+        assert not won
+        player = other_player(player)
+
+    with pytest.raises(ValueError):
+        _, _ = g.move(state, 0, player)
 
 
 def test_win_at_pos():
     n_rows, n_cols, n_to_win = 6, 7, 4
     g = ConnectNGame(n_rows, n_cols, n_to_win)
 
-    # Player 1
     players = [Player.FIRST_PLAYER, Player.SECOND_PLAYER]
 
     for player in players:
