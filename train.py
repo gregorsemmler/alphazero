@@ -2,7 +2,9 @@ import logging
 from collections import deque
 from copy import deepcopy
 
+import numpy as np
 import torch
+import torch.nn.functional as F
 from torch.optim import SGD
 from torch.optim.lr_scheduler import MultiStepLR
 
@@ -29,11 +31,12 @@ def main():
     mcts = MCTS(model, game, game.n_actions, device_token=device_token)
 
     replay_buffer_size = 100000
+    batch_size = 256
     lr = 0.1
     momentum = 0.9
     l2_regularization = 1e-4
     train_steps = 20  # TODO after how many batch updates to save a checkpoint and evaluate with best model
-    min_size_to_train = 2000
+    min_size_to_train = 5000
 
     def simple_tau_sched(x):
         return 0 if x > 30 else 1
@@ -58,8 +61,22 @@ def main():
             continue
 
         for batch_idx in range(train_steps):
-            pass
+            batch_samples = np.random.choice(replay_buffer, size=batch_size, replace=False)
+            batch_states, batch_probs, batch_vals = zip(*batch_samples)  # TODO separate class for replay buffer?
+            states_t = torch.stack([mcts.game.state_to_tensor(el, device=device) for el in batch_states])
+            vals_t = torch.tensor(batch_vals, device=device)
+            probs_t = torch.tensor(batch_probs, device=device)
 
+            log_probs_out, val_out = model(states_t)
+
+            value_loss = F.mse_loss(val_out.squeeze(), vals_t)
+            policy_loss = -F.log_softmax(log_probs_out, dim=1) * probs_t
+            policy_loss = policy_loss.sum(dim=1).mean()
+            loss = value_loss + policy_loss
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
         pass
     pass

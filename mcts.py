@@ -70,8 +70,8 @@ class MCTS(object):
             step_idx += 1
 
         if replay_buffer is not None:
-            for s, p, pr in game_history:
-                replay_buffer.append((s, p, pr, final_result if p == player else (-1) * final_result))
+            for st, pl, prb in game_history:
+                replay_buffer.append((st, prb, final_result if pl == player else (-1) * final_result))
 
         return first_player_result, step_idx
 

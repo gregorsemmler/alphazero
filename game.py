@@ -1,6 +1,7 @@
 from enum import Enum
 
 import numpy as np
+import torch
 
 
 class Player(Enum):
@@ -21,6 +22,9 @@ class Game(object):
         raise NotImplementedError()
 
     def move(self, state, action, player):
+        raise NotImplementedError()
+
+    def state_to_tensor(self, state, device):
         raise NotImplementedError()
 
     def render(self, state):
@@ -121,6 +125,16 @@ class ConnectNGame(Game):
 
         lines.extend([index_line, sep_line])
         return "\n".join(lines)
+
+    def state_to_tensor(self, state, device):
+        result = torch.zeros(2, self.n_rows, self.n_cols, device=device)
+        for r_idx in range(self.n_rows):
+            for c_idx in range(self.n_cols):
+                if state[r_idx, c_idx] == Player.FIRST_PLAYER.value:
+                    result[0, r_idx, c_idx] = 1
+                elif state[r_idx, c_idx] == Player.SECOND_PLAYER.value:
+                    result[1, r_idx, c_idx] = 1
+        return result
 
     def render(self, state):
         print(self.state_to_string(state))
