@@ -23,8 +23,10 @@ class MCTS(object):
         self.p = {}
         self.device = torch.device(device_token)
 
-    def play_match(self, other_mcts, num_mcts_searches, tau_func, first_player=None, replay_buffer=None):
-        if type(self.game) is not type(other_mcts):
+    def play_match(self, num_mcts_searches, tau_func, other_mcts=None, first_player=None, replay_buffer=None):
+        if other_mcts is None:
+            other_mcts = self
+        if type(self.game) is not type(other_mcts.game):
             raise RuntimeError("Other MCTS object has game of different type")
 
         def switch_player(p):
