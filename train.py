@@ -21,6 +21,17 @@ from utils import save_checkpoint, load_checkpoint
 logger = logging.getLogger(__name__)
 
 
+def evaluate(game, model1, model2, num_mcts_searches, num_matches, device=torch.device("cpu")):
+    mcts1 = MCTS(model1, game, search_batch_size=num_mcts_searches, device=device)
+    mcts2 = MCTS(model2, game, search_batch_size=num_mcts_searches, device=device)
+
+    for _ in range(num_matches):
+        mcts1.play_match(num_mcts_searches, lambda x: 0.0, mcts2)
+
+    print("")
+    pass
+
+
 def scheduler_step(scheduler, writer=None, log_idx=None, log_prefix=None):
     try:
         scheduler.step()
@@ -64,7 +75,7 @@ def main():
         logger.info(f"Loaded pretrained model from \"{pretrained_model_path}\"")
 
     best_model = deepcopy(model)
-    mcts = MCTS(model, game, game.n_actions, device_token=device_token)
+    mcts = MCTS(best_model, game, device=device)
 
     replay_buffer_size = 100000
     batch_size = 256

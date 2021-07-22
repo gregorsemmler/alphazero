@@ -8,11 +8,11 @@ from game import Player
 
 class MCTS(object):
 
-    def __init__(self, model, game, num_actions, search_batch_size=8, c_puct=1.0, epsilon=0.25, alpha=0.03,
-                 device_token="cpu"):
+    def __init__(self, model, game, search_batch_size=8, c_puct=1.0, epsilon=0.25, alpha=0.03,
+                 device=torch.device("cpu")):
         self.model = model
         self.game = game
-        self.num_actions = num_actions
+        self.num_actions = game.num_actions
         self.search_batch_size = search_batch_size
         self.alpha = alpha
         self.epsilon = epsilon
@@ -21,7 +21,7 @@ class MCTS(object):
         self.w = {}
         self.q = {}
         self.p = {}
-        self.device = torch.device(device_token)
+        self.device = device
 
     def play_match(self, num_mcts_searches, tau_func, other_mcts=None, first_player=None, replay_buffer=None):
         if other_mcts is None:

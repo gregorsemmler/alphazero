@@ -21,6 +21,10 @@ class Game(object):
     def invalid_actions(self, state):
         raise NotImplementedError()
 
+    @property
+    def num_actions(self):
+        raise NotImplementedError()
+
     def move(self, state, action, player):
         raise NotImplementedError()
 
@@ -54,6 +58,10 @@ class ConnectNGame(Game):
     def invalid_actions(self, state):
         is_valid = state[0] == Player.NO_PLAYER.value
         return {idx for idx in range(len(is_valid)) if not is_valid[idx]}
+
+    @property
+    def num_actions(self):
+        return self.n_actions
 
     def move(self, state, action, player):
         if action in self.invalid_actions(state):
