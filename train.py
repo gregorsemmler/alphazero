@@ -1,16 +1,15 @@
 import logging
 from collections import deque
 from copy import deepcopy
+from datetime import datetime
 from os import makedirs
-from os.path import exists, join
+from os.path import join
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.optim import SGD
 from torch.optim.lr_scheduler import MultiStepLR
-from datetime import datetime
-
 from torch.utils.tensorboard import SummaryWriter
 
 from game import ConnectNGame
@@ -25,11 +24,15 @@ def evaluate(game, model1, model2, num_mcts_searches, num_matches, device=torch.
     mcts1 = MCTS(model1, game, search_batch_size=num_mcts_searches, device=device)
     mcts2 = MCTS(model2, game, search_batch_size=num_mcts_searches, device=device)
 
-    for _ in range(num_matches):
-        mcts1.play_match(num_mcts_searches, lambda x: 0.0, mcts2)
+    n_wins1, n_wins2 = 0, 0
 
-    print("")
-    pass
+    for _ in range(num_matches):
+        r, _ = mcts1.play_match(num_mcts_searches, lambda x: 0.0, mcts2)
+
+        if r > 0:
+            n_wins1 += 1
+
+    return n_wins1 / num_matches
 
 
 def scheduler_step(scheduler, writer=None, log_idx=None, log_prefix=None):
@@ -77,6 +80,7 @@ def main():
     best_model = deepcopy(model)
     mcts = MCTS(best_model, game, device=device)
 
+    best_win_ratio = 0.55
     replay_buffer_size = 100000
     batch_size = 256
     lr = 0.1
@@ -93,12 +97,16 @@ def main():
     num_games_played = 50
     milestones = [int(el) for el in [200e3, 400e3, 600e3]]  # Milestones for mini-batch lr scheduling steps from paper
 
+    num_eval_mcts_searches = 100
+    num_eval_games = 50
+
     optimizer = SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=l2_regularization)
     scheduler = MultiStepLR(optimizer, milestones=milestones)
     replay_buffer = deque(maxlen=replay_buffer_size)
 
     curr_epoch_idx = 0
     curr_train_batch_idx = 0
+    best_model_idx = 0
 
     while True:
 
@@ -151,6 +159,15 @@ def main():
         logger.info(f"Training - Epoch {curr_epoch_idx}: Loss {epoch_loss}")
 
         curr_epoch_idx += 1
+
+        win_ratio = evaluate(game, model, best_model, num_eval_mcts_searches, num_eval_games, device=device)
+        logger.info(f"Evaluation against best model, win ratio: {win_ratio}")
+        if win_ratio > best_win_ratio:
+            best_model.load_state_dict(model.state_dict())
+            best_fname = f"{model_id}_best_{best_model_idx}.tar"
+            save_checkpoint(join(best_models_path, best_fname), model, optimizer, model_id=curr_epoch_idx)
+            logger.info(f"New Best Model {best_model_idx} saved")
+            mcts.reset()
 
         pass
     pass

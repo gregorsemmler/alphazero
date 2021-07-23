@@ -2,13 +2,14 @@ from math import sqrt
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 
-from game import Player
+from game import Player, switch_player, Game
 
 
 class MCTS(object):
 
-    def __init__(self, model, game, search_batch_size=8, c_puct=1.0, epsilon=0.25, alpha=0.03,
+    def __init__(self, model, game: Game, search_batch_size=8, c_puct=1.0, epsilon=0.25, alpha=0.03,
                  device=torch.device("cpu")):
         self.model = model
         self.game = game
@@ -23,14 +24,17 @@ class MCTS(object):
         self.p = {}
         self.device = device
 
+    def reset(self):
+        self.n = {}
+        self.w = {}
+        self.q = {}
+        self.p = {}
+
     def play_match(self, num_mcts_searches, tau_func, other_mcts=None, first_player=None, replay_buffer=None):
         if other_mcts is None:
             other_mcts = self
         if type(self.game) is not type(other_mcts.game):
             raise RuntimeError("Other MCTS object has game of different type")
-
-        def switch_player(p):
-            return Player.FIRST_PLAYER if p == Player.SECOND_PLAYER else Player.SECOND_PLAYER
 
         state = self.game.initial_state()
         first_player = first_player if first_player is not None else np.random.choice(
@@ -44,6 +48,9 @@ class MCTS(object):
         first_player_result = None
         final_result = None
 
+        self.model.eval()
+        other_mcts.model.eval()
+
         while True:
             tau = tau_func(step_idx)
             m: MCTS = mcts_d[player]
@@ -51,7 +58,7 @@ class MCTS(object):
             probs = m.policy_value(state, tau)
             game_history.append((state, player, probs))
             action = np.random.choice(self.num_actions, p=probs)
-            if action in m.game.invalid_actions():
+            if action in m.game.invalid_actions(state):
                 raise RuntimeError("Impossible Action selected")
             state, won = m.game.move(state, action, player)
 
@@ -76,7 +83,7 @@ class MCTS(object):
         return first_player_result, step_idx
 
     def is_leaf_state(self, state):
-        return state in self.p
+        return self.game.encode_state(state) not in self.p
 
     # TODO refactor?
     def traversals_and_backups(self, number_of_searches, state, player):
@@ -85,7 +92,7 @@ class MCTS(object):
 
     def traverse_and_backup(self, count, state, player):
         backup_queue = []  # TODO rename?
-        planned = set()  # TODO specific state class?
+        planned = {}
         expand_queue = []
 
         for _ in range(count):
@@ -94,54 +101,63 @@ class MCTS(object):
             if value is not None:
                 backup_queue.append((value, states, actions))
             else:
-                if leaf_state not in planned:
-                    planned.add(leaf_state)
+                leaf_state_h = self.game.encode_state(leaf_state)
+                if leaf_state_h not in planned:
+                    planned[leaf_state_h] = leaf_state
                     expand_queue.append((leaf_state, states, actions))
 
         if len(planned) > 0:
             # expand nodes:
-            model_in = self.model.state_to_input(planned, self.device)
-            prior_probs_out, values_out = self.model.predict(model_in)
+            model_in = torch.stack([self.game.state_to_tensor(el, device=self.device) for k, el in planned.items()])
+
+            with torch.no_grad():
+                log_probs_out, values_out = self.model(model_in)
+                prior_probs_out = F.softmax(log_probs_out, dim=1)
 
             values_np = values_out.detach().cpu().numpy()
             prior_probs_np = prior_probs_out.detach().cpu().numpy()
 
-            for (leaf_state, states, actions), val, prob in zip(expand_queue, values_np, prior_probs_np):
-                self.n[leaf_state] = np.zeros((self.num_actions,))
-                self.w[leaf_state] = np.zeros((self.num_actions,))
-                self.q[leaf_state] = np.zeros((self.num_actions,))
-                self.p[leaf_state] = np.zeros((self.num_actions,))
+            for idx, ((leaf_state, states, actions), val, prob) in enumerate(
+                    zip(expand_queue, values_np, prior_probs_np)):
+                # TODO refactor
+                state_h = self.game.encode_state(leaf_state)
+                self.n[state_h] = np.zeros((self.num_actions,))
+                self.w[state_h] = np.zeros((self.num_actions,))
+                self.q[state_h] = np.zeros((self.num_actions,))
+                self.p[state_h] = prior_probs_np[idx]
                 backup_queue.append((val, states, actions))
 
         # perform backup
         for val, states, actions in backup_queue:
             # TODO refactor
             cur_value = -val
-            for state_int, action in zip(states[::-1], actions[::-1]):
-                self.n[state_int][action] += 1
-                self.w[state_int][action] += cur_value
-                self.q[state_int][action] = self.w[state_int][action] / self.n[state_int][action]
+            for state, action in zip(reversed(states), reversed(actions)):
+                state_h = self.game.encode_state(state)
+                self.n[state_h][action] += 1
+                self.w[state_h][action] += cur_value
+                self.q[state_h][action] = self.w[state_h][action] / self.n[state_h][action]
                 cur_value = -cur_value
 
     def traverse(self, state, player):
-        states = []
-        actions = []
+        visited_states = []
+        taken_actions = []
         cur_state = state
         value = None
         cur_player = player
         root_node = True
 
-        while not self.is_leaf_state(state):
-            states.append(cur_state)
+        while not self.is_leaf_state(cur_state):
+            visited_states.append(cur_state)
+            cur_state_h = self.game.encode_state(cur_state)
 
-            visit_counts = self.w[cur_state]
-            state_probs = self.p[cur_state]
-            state_values = self.q[cur_state]
+            visit_counts = self.n[cur_state_h]
+            state_probs = self.p[cur_state_h]
+            state_values = self.q[cur_state_h]
 
             if root_node:
                 root_node = False
                 state_probs = (1 - self.epsilon) * state_probs + self.epsilon * np.random.dirichlet(
-                    [self.epsilon] * self.num_actions)
+                    [self.alpha] * self.num_actions)
 
             state_score = state_values + self.c_puct * state_probs * sqrt(sum(visit_counts)) / (1 + visit_counts)
 
@@ -149,6 +165,8 @@ class MCTS(object):
             state_score[list(invalid_actions)] = -np.inf
 
             cur_action = int(state_score.argmax())
+            taken_actions.append(cur_action)
+
             cur_state, won = self.game.move(cur_state, cur_action, cur_player)  # TODO refactor?
             if won:
                 value = -1.0
@@ -156,16 +174,17 @@ class MCTS(object):
                 # Draw
                 value = 0.0
 
-            cur_player = 1 if cur_player == 0 else 1  # TODO refactor?
+            cur_player = switch_player(cur_player)
 
         # TODO return is_leaf instead of returning Value == None?
-        return value, cur_state, cur_player, states, actions
+        return value, cur_state, cur_player, visited_states, taken_actions
 
     def policy_value(self, state, tau=1.0):
-        counts = self.n[state]
+        state_h = self.game.encode_state(state)
+        counts = self.n[state_h]
         if tau == 0.0:
             result = np.zeros((self.num_actions,))
-            result[counts.argmax()] = 1.0
+            result[counts.argmax()] = 1.0  # TODO tie breaking?
             return result
 
         sum_counts = counts.sum()

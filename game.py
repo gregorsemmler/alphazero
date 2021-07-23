@@ -10,6 +10,10 @@ class Player(Enum):
     SECOND_PLAYER = 2
 
 
+def switch_player(p):
+    return Player.FIRST_PLAYER if p == Player.SECOND_PLAYER else Player.SECOND_PLAYER
+
+
 class Game(object):
 
     def initial_state(self):
@@ -32,6 +36,9 @@ class Game(object):
         raise NotImplementedError()
 
     def render(self, state):
+        raise NotImplementedError()
+
+    def encode_state(self, state):
         raise NotImplementedError()
 
 
@@ -58,6 +65,9 @@ class ConnectNGame(Game):
     def invalid_actions(self, state):
         is_valid = state[0] == Player.NO_PLAYER.value
         return {idx for idx in range(len(is_valid)) if not is_valid[idx]}
+
+    def encode_state(self, state):
+        return hash(state.data.tobytes())
 
     @property
     def num_actions(self):
