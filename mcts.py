@@ -54,7 +54,7 @@ class MCTS(object):
         while True:
             tau = tau_func(step_idx)
             m: MCTS = mcts_d[player]
-            m.traversals_and_backups(num_mcts_searches, state, player)
+            m.traverse_and_backup(num_mcts_searches, state, player)
             probs = m.policy_value(state, tau)
             game_history.append((state, player, probs))
             action = np.random.choice(self.num_actions, p=probs)
@@ -85,58 +85,54 @@ class MCTS(object):
     def is_leaf_state(self, state):
         return self.game.encode_state(state) not in self.p
 
-    # TODO refactor?
-    def traversals_and_backups(self, number_of_searches, state, player):
-        for _ in range(number_of_searches):
-            self.traverse_and_backup(self.search_batch_size, state, player)
-
-    def traverse_and_backup(self, count, state, player):
+    def traverse_and_backup(self, number_of_simulations, state, player):
         backup_queue = []  # TODO rename?
         planned = {}
         expand_queue = []
 
-        for _ in range(count):
-            value, leaf_state, leaf_player, states, actions = self.traverse(state, player)
+        for _ in range(number_of_simulations):
+            for _ in range(self.search_batch_size):
+                value, leaf_state, leaf_player, states, actions = self.traverse(state, player)
 
-            if value is not None:
-                backup_queue.append((value, states, actions))
-            else:
-                leaf_state_h = self.game.encode_state(leaf_state)
-                if leaf_state_h not in planned:
-                    planned[leaf_state_h] = leaf_state
-                    expand_queue.append((leaf_state, states, actions))
+                if value is not None:
+                    backup_queue.append((value, states, actions))
+                else:
+                    leaf_state_h = self.game.encode_state(leaf_state)
+                    if leaf_state_h not in planned:
+                        planned[leaf_state_h] = leaf_state
+                        expand_queue.append((leaf_state, states, actions))
 
-        if len(planned) > 0:
-            # expand nodes:
-            model_in = torch.stack([self.game.state_to_tensor(el, device=self.device) for k, el in planned.items()])
+            if len(planned) > 0:
+                # expand nodes:
+                model_in = torch.stack([self.game.state_to_tensor(el, device=self.device) for k, el in planned.items()])
 
-            with torch.no_grad():
-                log_probs_out, values_out = self.model(model_in)
-                prior_probs_out = F.softmax(log_probs_out, dim=1)
+                with torch.no_grad():
+                    log_probs_out, values_out = self.model(model_in)
+                    prior_probs_out = F.softmax(log_probs_out, dim=1)
 
-            values_np = values_out.detach().cpu().numpy()
-            prior_probs_np = prior_probs_out.detach().cpu().numpy()
+                values_np = values_out.detach().cpu().numpy()
+                prior_probs_np = prior_probs_out.detach().cpu().numpy()
 
-            for idx, ((leaf_state, states, actions), val, prob) in enumerate(
-                    zip(expand_queue, values_np, prior_probs_np)):
+                for idx, ((leaf_state, states, actions), val, prob) in enumerate(
+                        zip(expand_queue, values_np, prior_probs_np)):
+                    # TODO refactor
+                    state_h = self.game.encode_state(leaf_state)
+                    self.n[state_h] = np.zeros((self.num_actions,))
+                    self.w[state_h] = np.zeros((self.num_actions,))
+                    self.q[state_h] = np.zeros((self.num_actions,))
+                    self.p[state_h] = prior_probs_np[idx]
+                    backup_queue.append((val, states, actions))
+
+            # perform backup
+            for val, states, actions in backup_queue:
                 # TODO refactor
-                state_h = self.game.encode_state(leaf_state)
-                self.n[state_h] = np.zeros((self.num_actions,))
-                self.w[state_h] = np.zeros((self.num_actions,))
-                self.q[state_h] = np.zeros((self.num_actions,))
-                self.p[state_h] = prior_probs_np[idx]
-                backup_queue.append((val, states, actions))
-
-        # perform backup
-        for val, states, actions in backup_queue:
-            # TODO refactor
-            cur_value = -val
-            for state, action in zip(reversed(states), reversed(actions)):
-                state_h = self.game.encode_state(state)
-                self.n[state_h][action] += 1
-                self.w[state_h][action] += cur_value
-                self.q[state_h][action] = self.w[state_h][action] / self.n[state_h][action]
-                cur_value = -cur_value
+                cur_value = -val
+                for state, action in zip(reversed(states), reversed(actions)):
+                    state_h = self.game.encode_state(state)
+                    self.n[state_h][action] += 1
+                    self.w[state_h][action] += cur_value
+                    self.q[state_h][action] = self.w[state_h][action] / self.n[state_h][action]
+                    cur_value = -cur_value
 
     def traverse(self, state, player):
         visited_states = []
