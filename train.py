@@ -11,6 +11,7 @@ import torch.nn.functional as F
 from torch.optim import SGD
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.tensorboard import SummaryWriter
+from timeit import default_timer as timer
 
 from game import ConnectNGame
 from mcts import MCTS
@@ -26,8 +27,12 @@ def evaluate(game, model1, model2, num_mcts_searches, num_matches, device=torch.
 
     n_wins1, n_wins2 = 0, 0
 
-    for _ in range(num_matches):
-        r, _ = mcts1.play_match(num_mcts_searches, lambda x: 0.0, mcts2)
+    for match_idx in range(num_matches):
+        s = timer()
+        r, m_s = mcts1.play_match(num_mcts_searches, lambda x: 0.0, other_mcts=mcts2)
+        e = timer()
+        m_t = e - s
+        logger.info(f"Eval Match {match_idx} with {m_s} steps took {m_t:.3f} seconds ({m_s / m_t:.3f} steps/s).")
 
         if r > 0:
             n_wins1 += 1
@@ -51,10 +56,7 @@ def main():
 
     checkpoint_path = "model_checkpoints"
     best_models_path = join(checkpoint_path, "best")
-    pretrained_model_path = None
-    pretrained = pretrained_model_path is not None
-
-    run_id = "testrun1"
+    run_id = f"testrun1_{datetime.now():%d%m%Y_%H%M%S}"
     model_id = f"{run_id}"
     writer = SummaryWriter(comment=f"-{model_id}-{run_id}")
 
@@ -69,9 +71,13 @@ def main():
 
     input_shape = (2, game.n_rows, game.n_cols)
     num_filters = 64
-    num_residual_blocks = 5
+    num_residual_blocks = 3
     val_hidden_size = 20
     model = CNNModel(input_shape, num_filters, num_residual_blocks, val_hidden_size, game.n_cols).to(device)
+
+    pretrained_model_path = None
+    # pretrained_model_path = "model_checkpoints/best/testrun1_best_1.tar"
+    pretrained = pretrained_model_path is not None
 
     if pretrained:
         load_checkpoint(pretrained_model_path, model, device=device)
@@ -86,18 +92,18 @@ def main():
     lr = 0.1
     momentum = 0.9
     l2_regularization = 1e-4
-    train_steps = 20
+    train_steps = 50
     min_size_to_train = 5000
     save_all_eval_checkpoints = True
 
     def simple_tau_sched(x):
         return 0 if x > 30 else 1
 
-    num_mcts_searches = 100
+    num_mcts_searches = 10
     num_games_played = 50
     milestones = [int(el) for el in [200e3, 400e3, 600e3]]  # Milestones for mini-batch lr scheduling steps from paper
 
-    num_eval_mcts_searches = 100
+    num_eval_mcts_searches = 10
     num_eval_games = 50
 
     optimizer = SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=l2_regularization)
@@ -111,7 +117,12 @@ def main():
     while True:
 
         for game_idx in range(num_games_played):
-            _, match_steps = mcts.play_match(num_mcts_searches, simple_tau_sched, replay_buffer=replay_buffer)
+            s = timer()
+            _, m_steps = mcts.play_match(num_mcts_searches, simple_tau_sched, replay_buffer=replay_buffer)
+            e = timer()
+            m_t = e - s
+            logger.info(
+                f"Match {game_idx} with {m_steps} steps took {m_t:.3f} seconds ({m_steps / m_t:.3f} steps/s).")
 
         if len(replay_buffer) < min_size_to_train:
             continue
@@ -121,11 +132,12 @@ def main():
 
         model.train()
         for _ in range(train_steps):
-            batch_samples = np.random.choice(replay_buffer, size=batch_size, replace=False)
+            batch_indices = np.random.choice(len(replay_buffer), size=batch_size, replace=False)
+            batch_samples = [replay_buffer[idx] for idx in batch_indices]
             batch_states, batch_probs, batch_vals = zip(*batch_samples)  # TODO separate class for replay buffer?
             states_t = torch.stack([mcts.game.state_to_tensor(el, device=device) for el in batch_states])
-            vals_t = torch.tensor(batch_vals, device=device)
-            probs_t = torch.tensor(batch_probs, device=device)
+            vals_t = torch.tensor(batch_vals, device=device, dtype=torch.float32)
+            probs_t = torch.tensor(batch_probs, device=device, dtype=torch.float32)
 
             log_probs_out, val_out = model(states_t)
 
@@ -151,9 +163,9 @@ def main():
         epoch_loss /= max(1.0, count_batches)
 
         if save_all_eval_checkpoints:
-            save_fname = f"{model_id}_{curr_epoch_idx}_{datetime.now():%d%m%Y_%H%M%S}.tar"
-            save_checkpoint(join(checkpoint_path, save_fname), model, optimizer, model_id=curr_epoch_idx)
-            logging.info(f"Saved {curr_epoch_idx} checkpoint after {curr_train_batch_idx} steps")
+            save_fname = f"{model_id}_{curr_epoch_idx}.tar"
+            save_checkpoint(join(checkpoint_path, save_fname), model, model_id=curr_epoch_idx)
+            logging.info(f"Saved checkpoint {curr_epoch_idx} after {count_batches} steps")
 
         writer.add_scalar("train_epoch/loss", epoch_loss, curr_epoch_idx)
         logger.info(f"Training - Epoch {curr_epoch_idx}: Loss {epoch_loss}")
@@ -165,9 +177,10 @@ def main():
         if win_ratio > best_win_ratio:
             best_model.load_state_dict(model.state_dict())
             best_fname = f"{model_id}_best_{best_model_idx}.tar"
-            save_checkpoint(join(best_models_path, best_fname), model, optimizer, model_id=curr_epoch_idx)
+            save_checkpoint(join(best_models_path, best_fname), model, model_id=curr_epoch_idx)
             logger.info(f"New Best Model {best_model_idx} saved")
             mcts.reset()
+            best_model_idx += 1
 
         pass
     pass
