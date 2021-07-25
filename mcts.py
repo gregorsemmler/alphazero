@@ -16,6 +16,9 @@ class TreeNode(object):
         self.states_visited = states_visited
         self.actions_taken = actions_taken
 
+    def __str__(self):
+        return f"{self.state} - {self.player} - {self.states_visited} - {self.actions_taken}"
+
 
 class GameHistoryEntry(object):
 
@@ -24,6 +27,9 @@ class GameHistoryEntry(object):
         self.player = player
         self.probs = probs
         self.value = value
+
+    def __str__(self):
+        return f"{self.state} - {self.player} - {self.probs} - {self.value}"
 
 
 class MonteCarloTreeSearch(object):
