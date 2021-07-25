@@ -14,7 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 from timeit import default_timer as timer
 
 from game import ConnectNGame
-from mcts import MCTS
+from mcts import MonteCarloTreeSearch
 from model import CNNModel
 from utils import save_checkpoint, load_checkpoint
 
@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 
 def evaluate(game, model1, model2, num_mcts_searches, num_matches, device=torch.device("cpu")):
-    mcts1 = MCTS(model1, game, search_batch_size=num_mcts_searches, device=device)
-    mcts2 = MCTS(model2, game, search_batch_size=num_mcts_searches, device=device)
+    mcts1 = MonteCarloTreeSearch(model1, game, search_batch_size=num_mcts_searches, device=device)
+    mcts2 = MonteCarloTreeSearch(model2, game, search_batch_size=num_mcts_searches, device=device)
 
     n_wins1, n_wins2 = 0, 0
 
@@ -84,7 +84,7 @@ def main():
         logger.info(f"Loaded pretrained model from \"{pretrained_model_path}\"")
 
     best_model = deepcopy(model)
-    mcts = MCTS(best_model, game, device=device)
+    mcts = MonteCarloTreeSearch(best_model, game, device=device)
 
     best_win_ratio = 0.55
     replay_buffer_size = 100000
@@ -92,9 +92,9 @@ def main():
     lr = 0.1
     momentum = 0.9
     l2_regularization = 1e-4
-    train_steps = 50
+    train_steps = 100
     min_size_to_train = 5000
-    save_all_eval_checkpoints = True
+    save_all_eval_checkpoints = False
 
     def simple_tau_sched(x):
         return 0 if x > 30 else 1
@@ -121,10 +121,12 @@ def main():
             _, m_steps = mcts.play_match(num_mcts_searches, simple_tau_sched, replay_buffer=replay_buffer)
             e = timer()
             m_t = e - s
-            logger.info(
-                f"Match {game_idx} with {m_steps} steps took {m_t:.3f} seconds ({m_steps / m_t:.3f} steps/s).")
+            logger.info(f"Epoch {curr_epoch_idx}: Match {game_idx} "
+                        f"with {m_steps} steps took {m_t:.3f} seconds ({m_steps / m_t:.3f} steps/s).")
 
         if len(replay_buffer) < min_size_to_train:
+            logger.info(f"Epoch {curr_epoch_idx}: Minimum replay buffer size "
+                        f"for training not yet reached {len(replay_buffer)}/{min_size_to_train}")
             continue
 
         epoch_loss = 0.0
@@ -134,10 +136,10 @@ def main():
         for _ in range(train_steps):
             batch_indices = np.random.choice(len(replay_buffer), size=batch_size, replace=False)
             batch_samples = [replay_buffer[idx] for idx in batch_indices]
-            batch_states, batch_probs, batch_vals = zip(*batch_samples)  # TODO separate class for replay buffer?
-            states_t = torch.stack([mcts.game.state_to_tensor(el, device=device) for el in batch_states])
-            vals_t = torch.tensor(batch_vals, device=device, dtype=torch.float32)
-            probs_t = torch.tensor(batch_probs, device=device, dtype=torch.float32)
+            states_t = torch.stack(
+                [mcts.game.state_to_tensor(el, device=device) for el in [e.state for e in batch_samples]])
+            vals_t = torch.tensor([e.value for e in batch_samples], device=device, dtype=torch.float32)
+            probs_t = torch.tensor([e.probs for e in batch_samples], device=device, dtype=torch.float32)
 
             log_probs_out, val_out = model(states_t)
 
@@ -154,7 +156,8 @@ def main():
 
             batch_loss = loss.item()
             writer.add_scalar("train_batch/loss", batch_loss, curr_train_batch_idx)
-            logger.info(f"Training - Model Idx: {curr_epoch_idx} Batch: {curr_train_batch_idx}: Loss {batch_loss}")
+            logger.info(f"Epoch {curr_epoch_idx}: Training - "
+                        f"Model Idx: {curr_epoch_idx} Batch: {curr_train_batch_idx}: Loss {batch_loss}")
             curr_train_batch_idx += 1
             count_batches += 1
 
@@ -168,7 +171,7 @@ def main():
             logging.info(f"Saved checkpoint {curr_epoch_idx} after {count_batches} steps")
 
         writer.add_scalar("train_epoch/loss", epoch_loss, curr_epoch_idx)
-        logger.info(f"Training - Epoch {curr_epoch_idx}: Loss {epoch_loss}")
+        logger.info(f"Epoch {curr_epoch_idx}: Loss {epoch_loss}")
 
         curr_epoch_idx += 1
 
@@ -178,7 +181,7 @@ def main():
             best_model.load_state_dict(model.state_dict())
             best_fname = f"{model_id}_best_{best_model_idx}.tar"
             save_checkpoint(join(best_models_path, best_fname), model, model_id=curr_epoch_idx)
-            logger.info(f"New Best Model {best_model_idx} saved")
+            logger.info(f"Epoch {curr_epoch_idx}: New Best Model {best_model_idx} saved")
             mcts.reset()
             best_model_idx += 1
 

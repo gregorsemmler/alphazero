@@ -7,7 +7,26 @@ import torch.nn.functional as F
 from game import Player, switch_player, Game
 
 
-class MCTS(object):
+class TreeNode(object):
+
+    def __init__(self, state, player, value=None, states_visited=(), actions_taken=()):
+        self.state = state
+        self.player = player
+        self.value = value
+        self.states_visited = states_visited
+        self.actions_taken = actions_taken
+
+
+class GameHistoryEntry(object):
+
+    def __init__(self, state, player, probs, value=None):
+        self.state = state
+        self.player = player
+        self.probs = probs
+        self.value = value
+
+
+class MonteCarloTreeSearch(object):
 
     def __init__(self, model, game: Game, search_batch_size=8, c_puct=1.0, epsilon=0.25, alpha=0.03,
                  device=torch.device("cpu")):
@@ -53,10 +72,10 @@ class MCTS(object):
 
         while True:
             tau = tau_func(step_idx)
-            m: MCTS = mcts_d[player]
+            m: MonteCarloTreeSearch = mcts_d[player]
             m.traverse_and_backup(num_mcts_searches, state, player)
             probs = m.policy_value(state, tau)
-            game_history.append((state, player, probs))
+            game_history.append(GameHistoryEntry(state, player, probs))
             action = np.random.choice(self.num_actions, p=probs)
             if action in m.game.invalid_actions(state):
                 raise RuntimeError("Impossible Action selected")
@@ -77,8 +96,9 @@ class MCTS(object):
             step_idx += 1
 
         if replay_buffer is not None:
-            for st, pl, prb in game_history:
-                replay_buffer.append((st, prb, final_result if pl == player else (-1) * final_result))
+            for entry in game_history:
+                entry.value = final_result if entry.player == player else (-1) * final_result
+                replay_buffer.append(entry)
 
         return first_player_result, step_idx
 
@@ -86,25 +106,25 @@ class MCTS(object):
         return self.game.encode_state(state) not in self.p
 
     def traverse_and_backup(self, number_of_simulations, state, player):
-        backup_queue = []  # TODO rename?
-        planned = {}
+        backup_queue = []
+        planned = set()
         expand_queue = []
 
         for _ in range(number_of_simulations):
             for _ in range(self.search_batch_size):
-                value, leaf_state, leaf_player, states, actions = self.traverse(state, player)
+                leaf_node = self.traverse(state, player)
 
-                if value is not None:
-                    backup_queue.append((value, states, actions))
+                if leaf_node.value is not None:
+                    backup_queue.append(leaf_node)
                 else:
-                    leaf_state_h = self.game.encode_state(leaf_state)
+                    leaf_state_h = self.game.encode_state(leaf_node.state)
                     if leaf_state_h not in planned:
-                        planned[leaf_state_h] = leaf_state
-                        expand_queue.append((leaf_state, states, actions))
+                        planned.add(leaf_state_h)
+                        expand_queue.append(leaf_node)
 
             if len(planned) > 0:
                 # expand nodes:
-                model_in = torch.stack([self.game.state_to_tensor(el, device=self.device) for k, el in planned.items()])
+                model_in = torch.stack([self.game.state_to_tensor(el.state, device=self.device) for el in expand_queue])
 
                 with torch.no_grad():
                     log_probs_out, values_out = self.model(model_in)
@@ -113,21 +133,20 @@ class MCTS(object):
                 values_np = values_out.detach().cpu().numpy()
                 prior_probs_np = prior_probs_out.detach().cpu().numpy()
 
-                for idx, ((leaf_state, states, actions), val, prob) in enumerate(
+                for idx, (node, pred_val, pred_prob) in enumerate(
                         zip(expand_queue, values_np, prior_probs_np)):
-                    # TODO refactor
-                    state_h = self.game.encode_state(leaf_state)
+                    state_h = self.game.encode_state(node.state)
                     self.n[state_h] = np.zeros((self.num_actions,))
                     self.w[state_h] = np.zeros((self.num_actions,))
                     self.q[state_h] = np.zeros((self.num_actions,))
-                    self.p[state_h] = prior_probs_np[idx]
-                    backup_queue.append((val, states, actions))
+                    self.p[state_h] = pred_prob
+                    node.value = pred_val
+                    backup_queue.append(node)
 
             # perform backup
-            for val, states, actions in backup_queue:
-                # TODO refactor
-                cur_value = -val
-                for state, action in zip(reversed(states), reversed(actions)):
+            for node in backup_queue:
+                cur_value = -node.value
+                for state, action in zip(reversed(node.states_visited), reversed(node.actions_taken)):
                     state_h = self.game.encode_state(state)
                     self.n[state_h][action] += 1
                     self.w[state_h][action] += cur_value
@@ -163,7 +182,7 @@ class MCTS(object):
             cur_action = int(state_score.argmax())
             taken_actions.append(cur_action)
 
-            cur_state, won = self.game.move(cur_state, cur_action, cur_player)  # TODO refactor?
+            cur_state, won = self.game.move(cur_state, cur_action, cur_player)
             if won:
                 value = -1.0
             elif len(self.game.valid_actions(cur_state)) == 0:
@@ -172,8 +191,7 @@ class MCTS(object):
 
             cur_player = switch_player(cur_player)
 
-        # TODO return is_leaf instead of returning Value == None?
-        return value, cur_state, cur_player, visited_states, taken_actions
+        return TreeNode(cur_state, cur_player, value, visited_states, taken_actions)
 
     def policy_value(self, state, tau=1.0):
         state_h = self.game.encode_state(state)
