@@ -21,8 +21,8 @@ from utils import save_checkpoint, load_checkpoint
 logger = logging.getLogger(__name__)
 
 
-def evaluate(game, model1, model2, num_mcts_searches, num_matches, device=torch.device("cpu")):
-    mcts1 = MonteCarloTreeSearch(model1, game, search_batch_size=num_mcts_searches, device=device)
+def evaluate(game, model1, model2, num_mcts_searches, num_matches, device=torch.device("cpu")):  # TODO move method
+    mcts1 = MonteCarloTreeSearch(model1, game, search_batch_size=num_mcts_searches, device=device)  # TODO should be batch size, not num mcts searches here
     mcts2 = MonteCarloTreeSearch(model2, game, search_batch_size=num_mcts_searches, device=device)
 
     n_wins1, n_wins2 = 0, 0
@@ -58,7 +58,7 @@ def main():
     best_models_path = join(checkpoint_path, "best")
     run_id = f"testrun1_{datetime.now():%d%m%Y_%H%M%S}"
     model_id = f"{run_id}"
-    writer = SummaryWriter(comment=f"-{model_id}-{run_id}")
+    writer = SummaryWriter(comment=f"-{model_id}-{run_id}")  # TODO change to only "run_id" here
 
     makedirs(checkpoint_path, exist_ok=True)
     makedirs(best_models_path, exist_ok=True)
@@ -147,7 +147,7 @@ def main():
             value_loss = F.mse_loss(val_out.squeeze(), vals_t)
             policy_loss = -F.log_softmax(log_probs_out, dim=1) * probs_t
             policy_loss = policy_loss.sum(dim=1).mean()
-            loss = value_loss + policy_loss
+            loss = value_loss + policy_loss  # TODO separate log for value_loss and policy_loss
 
             optimizer.zero_grad()
             loss.backward()
