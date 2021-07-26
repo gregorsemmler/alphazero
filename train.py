@@ -92,7 +92,7 @@ def main():
     lr = 0.1
     momentum = 0.9
     l2_regularization = 1e-4
-    train_steps = 100
+    train_steps = 30
     min_size_to_train = 5000
     save_all_eval_checkpoints = False
 
@@ -122,7 +122,8 @@ def main():
             e = timer()
             m_t = e - s
             logger.info(f"Epoch {curr_epoch_idx}: Match {game_idx} "
-                        f"with {m_steps} steps took {m_t:.3f} seconds ({m_steps / m_t:.3f} steps/s).")
+                        f"with {m_steps} steps took {m_t:.3f} seconds ({m_steps / m_t:.3f} steps/s). "
+                        f"Replay Buffer Size: {len(replay_buffer)}")
 
         if len(replay_buffer) < min_size_to_train:
             logger.info(f"Epoch {curr_epoch_idx}: Minimum replay buffer size "

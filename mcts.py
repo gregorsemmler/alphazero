@@ -106,7 +106,7 @@ class MonteCarloTreeSearch(object):
                 entry.value = final_result if entry.player == player else (-1) * final_result
                 replay_buffer.append(entry)
 
-        return first_player_result, step_idx
+        return first_player_result, step_idx+1
 
     def is_leaf_state(self, state):
         return self.game.encode_state(state) not in self.p
