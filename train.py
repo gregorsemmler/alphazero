@@ -21,9 +21,9 @@ from utils import save_checkpoint, load_checkpoint
 logger = logging.getLogger(__name__)
 
 
-def evaluate(game, model1, model2, num_mcts_searches, num_matches, device=torch.device("cpu")):  # TODO move method
-    mcts1 = MonteCarloTreeSearch(model1, game, search_batch_size=num_mcts_searches, device=device)  # TODO should be batch size, not num mcts searches here
-    mcts2 = MonteCarloTreeSearch(model2, game, search_batch_size=num_mcts_searches, device=device)
+def evaluate(game, model1, model2, num_mcts_searches, num_matches, device=torch.device("cpu")):
+    mcts1 = MonteCarloTreeSearch(model1, game, device=device)
+    mcts2 = MonteCarloTreeSearch(model2, game, device=device)
 
     n_wins1, n_wins2 = 0, 0
 
@@ -58,7 +58,7 @@ def main():
     best_models_path = join(checkpoint_path, "best")
     run_id = f"testrun1_{datetime.now():%d%m%Y_%H%M%S}"
     model_id = f"{run_id}"
-    writer = SummaryWriter(comment=f"-{model_id}-{run_id}")  # TODO change to only "run_id" here
+    writer = SummaryWriter(comment=f"-{run_id}")
 
     makedirs(checkpoint_path, exist_ok=True)
     makedirs(best_models_path, exist_ok=True)
@@ -147,7 +147,7 @@ def main():
             value_loss = F.mse_loss(val_out.squeeze(), vals_t)
             policy_loss = -F.log_softmax(log_probs_out, dim=1) * probs_t
             policy_loss = policy_loss.sum(dim=1).mean()
-            loss = value_loss + policy_loss  # TODO separate log for value_loss and policy_loss
+            loss = value_loss + policy_loss
 
             optimizer.zero_grad()
             loss.backward()
@@ -157,8 +157,12 @@ def main():
 
             batch_loss = loss.item()
             writer.add_scalar("train_batch/loss", batch_loss, curr_train_batch_idx)
+            writer.add_scalar("train_batch/policy_loss", policy_loss.item(), curr_train_batch_idx)
+            writer.add_scalar("train_batch/value_loss", policy_loss.item(), curr_train_batch_idx)
+
             logger.info(f"Epoch {curr_epoch_idx}: Training - "
-                        f"Model Idx: {curr_epoch_idx} Batch: {curr_train_batch_idx}: Loss {batch_loss}")
+                        f"Model Idx: {curr_epoch_idx} Batch: {curr_train_batch_idx}: Loss {batch_loss}, "
+                        f"(Policy Loss: {policy_loss.item()}, Value Loss: {value_loss.item()})")
             curr_train_batch_idx += 1
             count_batches += 1
 
@@ -178,6 +182,7 @@ def main():
 
         win_ratio = evaluate(game, model, best_model, num_eval_mcts_searches, num_eval_games, device=device)
         logger.info(f"Evaluation against best model, win ratio: {win_ratio}")
+        writer.add_scalar("train_epoch/win_ratio", win_ratio, curr_epoch_idx)
         if win_ratio > best_win_ratio:
             best_model.load_state_dict(model.state_dict())
             best_fname = f"{model_id}_best_{best_model_idx}.tar"
