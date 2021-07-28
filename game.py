@@ -125,20 +125,21 @@ class ConnectNGame(Game):
 
         return False
 
+    @staticmethod
+    def val_to_char(val):
+        if val == Player.FIRST_PLAYER.value:
+            return "O"
+        if val == Player.SECOND_PLAYER.value:
+            return "X"
+        return " "
+
     def state_to_string(self, state):
         index_line = "".join([str(el) for el in range(self.n_cols)])
         sep_line = "-" * self.n_cols
         lines = [index_line, sep_line]
 
-        def val_to_char(val):
-            if val == Player.FIRST_PLAYER.value:
-                return "O"
-            if val == Player.SECOND_PLAYER.value:
-                return "X"
-            return " "
-
         for i_row in range(self.n_rows):
-            line = "".join([val_to_char(el) for el in state[i_row]])
+            line = "".join([self.val_to_char(el) for el in state[i_row]])
             lines.append(line)
 
         lines.extend([index_line, sep_line])
