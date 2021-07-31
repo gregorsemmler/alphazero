@@ -10,7 +10,7 @@ from utils import load_checkpoint
 
 
 def play_against_model():
-    model_path = "model_checkpoints/best/testrun1_26072021_100008_best_93.tar"
+    model_path = "model_checkpoints/best/testrun1_26072021_100008_best_80.tar"
     model_id = basename(model_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -30,15 +30,22 @@ def play_against_model():
     print(f"Pick a color, {ConnectNGame.val_to_char(Player.FIRST_PLAYER.value)}={Player.FIRST_PLAYER.value}, "
           f"{ConnectNGame.val_to_char(Player.SECOND_PLAYER.value)}={Player.SECOND_PLAYER.value}")
 
-    human_player = Player[input()]
+    human_col = int(input())
+    if human_col == Player.FIRST_PLAYER.value:
+        human_player = Player.FIRST_PLAYER
+    elif human_col == Player.SECOND_PLAYER.value:
+        human_player = Player.SECOND_PLAYER
+    else:
+        ValueError("Invalid Input given")
+
     model_player = switch_player(human_player)
-    whose_turn = np.random.choice([human_player, model_player])
 
     while True:
+        whose_turn = np.random.choice([human_player, model_player])
         state = game.initial_state()
-        game_over = False
 
-        while not game_over:
+        while True:
+            print("State")
             game.render(state)
             if whose_turn == human_player:
                 print(f"Your Turn (Pick a value between 0 and {game.num_actions})")
@@ -54,6 +61,14 @@ def play_against_model():
 
                 state, won = game.move(state, human_action, human_player)
 
+                if won:
+                    print("You won, congratulations")
+                    break
+                elif len(game.valid_actions(state)) == 0:
+                    # draw
+                    print("Draw!")
+                    break
+
             else:
                 # Play without MCTS here
                 print("My Turn")
@@ -66,8 +81,25 @@ def play_against_model():
                 values_np = values_out.detach().cpu().numpy()
                 prior_probs_np = prior_probs_out.detach().cpu().numpy()
 
-                print("State")
+                print(f"Value: {values_np}")
+                print(f"Prior Probabilities: {prior_probs_np}")
 
+                model_action = prior_probs_np.argmax()
+                state, won = game.move(state, model_action, model_player)
+
+                print(f"I chose action {model_action}")
+
+                if won:
+                    print("I won")
+                    break
+                elif len(game.valid_actions(state)) == 0:
+                    # draw
+                    print("Draw!")
+                    break
+
+            whose_turn = human_player if whose_turn == model_player else model_player
+
+        print("New Game")
 
     pass
 
