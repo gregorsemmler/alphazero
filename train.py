@@ -82,11 +82,12 @@ def main():
     # pretrained_model_path = "model_checkpoints/best/testrun1_best_1.tar"
     pretrained = pretrained_model_path is not None
 
-    replay_buffer_size = 100000
+    replay_buffer_size = 200000
 
     if replay_buffer_path is not None:
         with open(replay_buffer_path, "rb") as f:
             replay_buffer = pickle.load(f)
+        replay_buffer = deque(replay_buffer, maxlen=replay_buffer_size)
     else:
         replay_buffer = deque(maxlen=replay_buffer_size)
 
@@ -103,7 +104,7 @@ def main():
     momentum = 0.9
     l2_regularization = 1e-4
     # train_steps = 30
-    train_steps = 100
+    train_steps = 1000
     min_size_to_train = 5000
     save_all_eval_checkpoints = False
 
@@ -111,11 +112,11 @@ def main():
         return 0 if x > 30 else 1
 
     num_mcts_searches = 10
-    num_games_played = 50
+    num_games_played = 30
     milestones = [int(el) for el in [200e3, 400e3, 600e3]]  # Milestones for mini-batch lr scheduling steps from paper
 
     num_eval_mcts_searches = 10
-    num_eval_games = 50
+    num_eval_games = 30
 
     optimizer = SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=l2_regularization)
     scheduler = MultiStepLR(optimizer, milestones=milestones)
