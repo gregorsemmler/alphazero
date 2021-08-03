@@ -89,13 +89,11 @@ class MonteCarloTreeSearch(object):
 
             if won:
                 final_result = 1
-                first_player_result = final_result if player == first_player else (-1) * final_result
-            elif len(m.game.valid_actions(state)) == 0:
-                # draw
+            elif len(m.game.valid_actions(state)) == 0:  # draw
                 final_result = 0
-                first_player_result = final_result
 
             if final_result is not None:
+                first_player_result = final_result if player == Player.FIRST_PLAYER else (-1) * final_result
                 break
 
             player = switch_player(player)
