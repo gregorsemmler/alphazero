@@ -1,4 +1,5 @@
 import logging
+import pickle
 from collections import deque
 from copy import deepcopy
 from datetime import datetime
@@ -76,8 +77,18 @@ def main():
     model = CNNModel(input_shape, num_filters, num_residual_blocks, val_hidden_size, game.n_cols).to(device)
 
     pretrained_model_path = None
+    # replay_buffer_path = None
+    replay_buffer_path = "replay_buffers/replay_buffer_26072021_1641_fixed"
     # pretrained_model_path = "model_checkpoints/best/testrun1_best_1.tar"
     pretrained = pretrained_model_path is not None
+
+    replay_buffer_size = 100000
+
+    if replay_buffer_path is not None:
+        with open(replay_buffer_path, "rb") as f:
+            replay_buffer = pickle.load(f)
+    else:
+        replay_buffer = deque(maxlen=replay_buffer_size)
 
     if pretrained:
         load_checkpoint(pretrained_model_path, model, device=device)
@@ -87,12 +98,12 @@ def main():
     mcts = MonteCarloTreeSearch(best_model, game, device=device)
 
     best_win_ratio = 0.55
-    replay_buffer_size = 100000
     batch_size = 256
     lr = 0.1
     momentum = 0.9
     l2_regularization = 1e-4
-    train_steps = 30
+    # train_steps = 30
+    train_steps = 100
     min_size_to_train = 5000
     save_all_eval_checkpoints = False
 
@@ -108,7 +119,6 @@ def main():
 
     optimizer = SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=l2_regularization)
     scheduler = MultiStepLR(optimizer, milestones=milestones)
-    replay_buffer = deque(maxlen=replay_buffer_size)
 
     curr_epoch_idx = 0
     curr_train_batch_idx = 0
