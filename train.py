@@ -26,17 +26,19 @@ def evaluate(game, model1, model2, num_mcts_searches, num_matches, device=torch.
     mcts1 = MonteCarloTreeSearch(model1, game, device=device)
     mcts2 = MonteCarloTreeSearch(model2, game, device=device)
 
-    n_wins1, n_wins2 = 0, 0
+    n_wins1 = 0
 
     for match_idx in range(num_matches):
         s = timer()
         r, m_s = mcts1.play_match(num_mcts_searches, lambda x: 0.0, other_mcts=mcts2)
         e = timer()
         m_t = e - s
-        logger.info(f"Eval Match {match_idx} with {m_s} steps took {m_t:.3f} seconds ({m_s / m_t:.3f} steps/s).")
 
         if r > 0:
             n_wins1 += 1
+
+        logger.info(f"Eval Match {match_idx} with {m_s} steps took {m_t:.3f} seconds ({m_s / m_t:.3f} steps/s) "
+                    f"({n_wins1}/{match_idx+1} wins)")
 
     return n_wins1 / num_matches
 
@@ -77,17 +79,19 @@ def main():
     model = CNNModel(input_shape, num_filters, num_residual_blocks, val_hidden_size, game.n_cols).to(device)
 
     pretrained_model_path = None
-    # replay_buffer_path = None
-    replay_buffer_path = "replay_buffers/replay_buffer_26072021_1641_fixed"
-    # pretrained_model_path = "model_checkpoints/best/testrun1_best_1.tar"
+    replay_buffer_path = None
+    # replay_buffer_path = "replay_buffers/replay_buffer_26072021_1641_fixed"
+    # pretrained_model_path = "model_checkpoints/best/testrun1_03082021_161358_best_1.tar"
+    # pretrained_model_path = "model_checkpoints/best/testrun1_03082021_170143_best_1.tar"
     pretrained = pretrained_model_path is not None
 
     replay_buffer_size = 200000
 
-    if replay_buffer_path is not None:
+    if isinstance(replay_buffer_path, str):
         with open(replay_buffer_path, "rb") as f:
             replay_buffer = pickle.load(f)
         replay_buffer = deque(replay_buffer, maxlen=replay_buffer_size)
+        logger.info(f"Loaded replay buffer from \"{replay_buffer_path}\"")
     else:
         replay_buffer = deque(maxlen=replay_buffer_size)
 
@@ -103,8 +107,8 @@ def main():
     lr = 0.1
     momentum = 0.9
     l2_regularization = 1e-4
-    # train_steps = 30
-    train_steps = 1000
+    train_steps = 50
+    # train_steps = 1000
     min_size_to_train = 5000
     save_all_eval_checkpoints = False
 
@@ -112,7 +116,7 @@ def main():
         return 0 if x > 30 else 1
 
     num_mcts_searches = 10
-    num_games_played = 30
+    num_games_played = 50
     milestones = [int(el) for el in [200e3, 400e3, 600e3]]  # Milestones for mini-batch lr scheduling steps from paper
 
     num_eval_mcts_searches = 10
@@ -169,7 +173,7 @@ def main():
             batch_loss = loss.item()
             writer.add_scalar("train_batch/loss", batch_loss, curr_train_batch_idx)
             writer.add_scalar("train_batch/policy_loss", policy_loss.item(), curr_train_batch_idx)
-            writer.add_scalar("train_batch/value_loss", policy_loss.item(), curr_train_batch_idx)
+            writer.add_scalar("train_batch/value_loss", value_loss.item(), curr_train_batch_idx)
 
             logger.info(f"Epoch {curr_epoch_idx}: Training - "
                         f"Model Idx: {curr_epoch_idx} Batch: {curr_train_batch_idx}: Loss {batch_loss}, "
