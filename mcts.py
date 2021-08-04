@@ -55,22 +55,22 @@ class MonteCarloTreeSearch(object):
         self.q = {}
         self.p = {}
 
-    def play_match(self, num_mcts_searches, tau_func, other_mcts=None, first_player=None, replay_buffer=None):
+    def play_match(self, num_mcts_searches, tau_func, other_mcts=None, beginning_player=None, replay_buffer=None):
         if other_mcts is None:
             other_mcts = self
         if type(self.game) is not type(other_mcts.game):
             raise RuntimeError("Other MCTS object has game of different type")
 
         state = self.game.initial_state()
-        first_player = first_player if first_player is not None else np.random.choice(
+        beginning_player = beginning_player if beginning_player is not None else np.random.choice(
             [Player.FIRST_PLAYER, Player.SECOND_PLAYER])
-        other_player = switch_player(first_player)
-        player = first_player
+        other_player = switch_player(beginning_player)
+        player = beginning_player
         step_idx = 0
         game_history = []
 
-        mcts_d = {first_player: self, other_player: other_mcts}
-        first_player_result = None
+        mcts_d = {beginning_player: self, other_player: other_mcts}
+        beginning_player_result = None
         final_result = None
 
         self.model.eval()
@@ -93,7 +93,7 @@ class MonteCarloTreeSearch(object):
                 final_result = 0
 
             if final_result is not None:
-                first_player_result = final_result if player == Player.FIRST_PLAYER else (-1) * final_result
+                beginning_player_result = final_result if player == beginning_player else (-1) * final_result
                 break
 
             player = switch_player(player)
@@ -104,7 +104,7 @@ class MonteCarloTreeSearch(object):
                 entry.value = final_result if entry.player == player else (-1) * final_result
                 replay_buffer.append(entry)
 
-        return first_player_result, step_idx+1
+        return beginning_player_result, step_idx+1
 
     def is_leaf_state(self, state):
         return self.game.encode_state(state) not in self.p
