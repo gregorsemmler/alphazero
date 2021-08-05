@@ -10,7 +10,7 @@ from model import CNNModel
 from utils import load_checkpoint
 
 
-def predict_with_model(game, model, state, device, log_outputs=True):
+def predict_with_model(game, model, state, device, show_hints=True):
     model_in = game.state_to_tensor(state, device=device).unsqueeze(0)
 
     with torch.no_grad():
@@ -20,14 +20,14 @@ def predict_with_model(game, model, state, device, log_outputs=True):
     values_np = values_out.detach().cpu().numpy().squeeze()
     prior_probs_np = prior_probs_out.detach().cpu().numpy().squeeze()
 
-    if log_outputs:
+    if show_hints:
         print(f"Value: {values_np}")
         print(f"Prior Probabilities: {prior_probs_np}")
     return values_np, prior_probs_np
 
 
-def play_against_model(num_mcts_searches=30):
-    model_path = "model_checkpoints/best/testrun1_05082021_054909_best_53.tar"
+def play_against_model(num_mcts_searches=30, show_hints=True):
+    model_path = "model_checkpoints/best/testrun1_05082021_054909_best_78.tar"
     model_id = basename(model_path)
     # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = torch.device("cpu")
@@ -68,13 +68,14 @@ def play_against_model(num_mcts_searches=30):
             print("=" * 50)
             print("State")
             game.render(state)
-            predict_with_model(game, model, state, device)
+            predict_with_model(game, model, state, device, show_hints=show_hints)
 
             m.traverse_and_backup(num_mcts_searches, state, human_player)
             high_temp_probs = m.policy_value(state, 1)
-            print(f"Probabilities: {high_temp_probs}")
             low_temp_probs = m.policy_value(state, 0)
-            print(f"Suggested Action: {low_temp_probs.argmax()}")
+            if show_hints:
+                print(f"Probabilities: {high_temp_probs}")
+                print(f"Suggested Action: {low_temp_probs.argmax()}")
 
             if whose_turn == human_player:
                 print(f"Your Turn (Pick a value between 0 and {game.num_actions})")
@@ -212,4 +213,4 @@ def play_against_model_without_mcts():
 
 
 if __name__ == "__main__":
-    play_against_model()
+    play_against_model(num_mcts_searches=100, show_hints=False)
