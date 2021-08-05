@@ -78,11 +78,12 @@ def main():
     val_hidden_size = 20
     model = CNNModel(input_shape, num_filters, num_residual_blocks, val_hidden_size, game.n_cols).to(device)
 
-    pretrained_model_path = None
     replay_buffer_path = None
     # replay_buffer_path = "replay_buffers/replay_buffer_26072021_1641_fixed"
+    replay_buffer_path = "replay_buffers/replay_buffer_04082021_2055"
     # pretrained_model_path = "model_checkpoints/best/testrun1_03082021_161358_best_1.tar"
-    # pretrained_model_path = "model_checkpoints/best/testrun1_03082021_170143_best_1.tar"
+    pretrained_model_path = "model_checkpoints/best/testrun1_04082021_151335_best_72.tar"
+    # pretrained_model_path = None
     pretrained = pretrained_model_path is not None
 
     replay_buffer_size = 200000
@@ -176,7 +177,7 @@ def main():
             writer.add_scalar("train_batch/value_loss", value_loss.item(), curr_train_batch_idx)
 
             logger.info(f"Epoch {curr_epoch_idx}: Training - "
-                        f"Model Idx: {curr_epoch_idx} Batch: {curr_train_batch_idx}: Loss {batch_loss}, "
+                        f"Best Model Idx: {best_model_idx} Batch: {curr_train_batch_idx}: Loss {batch_loss}, "
                         f"(Policy Loss: {policy_loss.item()}, Value Loss: {value_loss.item()})")
             curr_train_batch_idx += 1
             count_batches += 1

@@ -10,7 +10,7 @@ from utils import load_checkpoint
 
 
 def play_against_model():
-    model_path = "model_checkpoints/best/testrun1_04082021_061444_best_30.tar"
+    model_path = "model_checkpoints/best_old/testrun1_26072021_100008_best_93.tar"
     model_id = basename(model_path)
     # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = torch.device("cpu")
