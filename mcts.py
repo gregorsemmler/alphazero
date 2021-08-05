@@ -202,7 +202,7 @@ class MonteCarloTreeSearch(object):
         counts = self.n[state_h]
         if tau == 0.0:
             result = np.zeros((self.num_actions,))
-            result[counts.argmax()] = 1.0  # TODO tie breaking?
+            result[counts.argmax()] = 1.0
             return result
 
         sum_counts = counts.sum()
