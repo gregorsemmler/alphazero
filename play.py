@@ -9,8 +9,25 @@ from model import CNNModel
 from utils import load_checkpoint
 
 
+def predict_with_model(game, model, state, device, log_outputs=True):
+    model_in = game.state_to_tensor(state, device=device).unsqueeze(0)
+
+    with torch.no_grad():
+        log_probs_out, values_out = model(model_in)
+        prior_probs_out = F.softmax(log_probs_out, dim=1)
+
+    values_np = values_out.detach().cpu().numpy().squeeze()
+    prior_probs_np = prior_probs_out.detach().cpu().numpy().squeeze()
+
+    if log_outputs:
+        print(f"Value: {values_np}")
+        print(f"Prior Probabilities: {prior_probs_np}")
+    return values_np, prior_probs_np
+
+
 def play_against_model():
-    model_path = "model_checkpoints/best_old/testrun1_26072021_100008_best_93.tar"
+    # model_path = "model_checkpoints/best_old/testrun1_26072021_100008_best_93.tar"
+    model_path = "model_checkpoints/best/testrun1_05082021_054909_best_53.tar"
     model_id = basename(model_path)
     # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = torch.device("cpu")
@@ -46,8 +63,11 @@ def play_against_model():
         state = game.initial_state()
 
         while True:
+            print("=" * 50)
             print("State")
             game.render(state)
+            values_np, prior_probs_np = predict_with_model(game, model, state, device)
+
             if whose_turn == human_player:
                 print(f"Your Turn (Pick a value between 0 and {game.num_actions})")
                 human_action_taken = False
@@ -73,17 +93,6 @@ def play_against_model():
             else:
                 # Play without MCTS here
                 print("My Turn")
-                model_in = game.state_to_tensor(state, device=device).unsqueeze(0)
-
-                with torch.no_grad():
-                    log_probs_out, values_out = model(model_in)
-                    prior_probs_out = F.softmax(log_probs_out, dim=1)
-
-                values_np = values_out.detach().cpu().numpy()
-                prior_probs_np = prior_probs_out.detach().cpu().numpy()
-
-                print(f"Value: {values_np}")
-                print(f"Prior Probabilities: {prior_probs_np}")
 
                 model_action = prior_probs_np.argmax()
                 state, won = game.move(state, model_action, model_player)
