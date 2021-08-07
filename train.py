@@ -5,6 +5,7 @@ from copy import deepcopy
 from datetime import datetime
 from os import makedirs
 from os.path import join
+from timeit import default_timer as timer
 
 import numpy as np
 import torch
@@ -12,12 +13,11 @@ import torch.nn.functional as F
 from torch.optim import SGD
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.tensorboard import SummaryWriter
-from timeit import default_timer as timer
 
 from game import ConnectNGame
 from mcts import MonteCarloTreeSearch
 from model import CNNModel
-from utils import save_checkpoint, load_checkpoint
+from utils import save_checkpoint, load_checkpoint, GracefulExit
 
 logger = logging.getLogger(__name__)
 
@@ -79,9 +79,8 @@ def main():
     model = CNNModel(input_shape, num_filters, num_residual_blocks, val_hidden_size, game.n_cols).to(device)
 
     replay_buffer_path = None
-    replay_buffer_path = "replay_buffers/replay_buffer_06082021_2110_200000"
-    # pretrained_model_path = "model_checkpoints/best/testrun1_03082021_161358_best_1.tar"
-    pretrained_model_path = "model_checkpoints/best/testrun1_06082021_060456_best_192.tar"
+    replay_buffer_path = "replay_buffers/replay_buffer_07082021_1212_284171"
+    pretrained_model_path = "model_checkpoints/best/testrun1_07082021_054238_best_66.tar"
     # pretrained_model_path = None
     pretrained = pretrained_model_path is not None
 
@@ -91,13 +90,13 @@ def main():
         with open(replay_buffer_path, "rb") as f:
             replay_buffer = pickle.load(f)
         replay_buffer = deque(replay_buffer, maxlen=replay_buffer_size)
-        logger.info(f"Loaded replay buffer from \"{replay_buffer_path}\"")
+        logger.info(f"Loaded replay buffer from \"{replay_buffer_path}\".")
     else:
         replay_buffer = deque(maxlen=replay_buffer_size)
 
     if pretrained:
         load_checkpoint(pretrained_model_path, model, device=device)
-        logger.info(f"Loaded pretrained model from \"{pretrained_model_path}\"")
+        logger.info(f"Loaded pretrained model from \"{pretrained_model_path}\".")
 
     best_model = deepcopy(model)
     mcts = MonteCarloTreeSearch(best_model, game, device=device)
@@ -129,7 +128,11 @@ def main():
     curr_train_batch_idx = 0
     best_model_idx = 0
 
-    while True:
+    graceful_exit = GracefulExit()
+    save_rp_buffer_on_exit = True
+    replay_buffers_save_path = "replay_buffers"
+
+    while graceful_exit.run:
 
         for game_idx in range(num_games_played):
             s = timer()
@@ -211,12 +214,21 @@ def main():
             best_model.load_state_dict(model.state_dict())
             best_fname = f"{model_id}_best_{best_model_idx}.tar"
             save_checkpoint(join(best_models_path, best_fname), model, model_id=curr_epoch_idx)
-            logger.info(f"Epoch {curr_epoch_idx}: New Best Model {best_model_idx} saved")
+            logger.info(f"Epoch {curr_epoch_idx}: New Best Model {best_model_idx} saved.")
             mcts.reset()
             best_model_idx += 1
 
         pass
     pass
+
+    if save_rp_buffer_on_exit:
+        makedirs(replay_buffers_save_path, exist_ok=True)
+        rp_save_path = join(replay_buffers_save_path,
+                            f"replay_buffer_{datetime.now():%d%m%Y_%H%M}_{len(replay_buffer)}")
+        with open(rp_save_path, "wb+") as f:
+            pickle.dump(replay_buffer, f)
+
+        logger.info(f"Saved current replay buffer to \"{rp_save_path}\".")
 
 
 if __name__ == "__main__":
