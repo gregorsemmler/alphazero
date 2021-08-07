@@ -27,7 +27,7 @@ def predict_with_model(game, model, state, device, show_hints=True):
 
 
 def play_against_model(num_mcts_searches=30, show_hints=True):
-    model_path = "model_checkpoints/best/testrun1_05082021_054909_best_78.tar"
+    model_path = "model_checkpoints/best/testrun1_05082021_054909_best_112.tar"
     model_id = basename(model_path)
     # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = torch.device("cpu")

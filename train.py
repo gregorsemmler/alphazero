@@ -79,10 +79,9 @@ def main():
     model = CNNModel(input_shape, num_filters, num_residual_blocks, val_hidden_size, game.n_cols).to(device)
 
     replay_buffer_path = None
-    # replay_buffer_path = "replay_buffers/replay_buffer_26072021_1641_fixed"
-    replay_buffer_path = "replay_buffers/replay_buffer_04082021_2055"
+    replay_buffer_path = "replay_buffers/replay_buffer_05082021_1641_200000"
     # pretrained_model_path = "model_checkpoints/best/testrun1_03082021_161358_best_1.tar"
-    pretrained_model_path = "model_checkpoints/best/testrun1_04082021_151335_best_72.tar"
+    pretrained_model_path = "model_checkpoints/best/testrun1_05082021_054909_best_122.tar"
     # pretrained_model_path = None
     pretrained = pretrained_model_path is not None
 
@@ -147,6 +146,8 @@ def main():
             continue
 
         epoch_loss = 0.0
+        epoch_policy_loss = 0.0
+        epoch_value_loss = 0.0
         count_batches = 0
 
         model.train()
@@ -183,8 +184,12 @@ def main():
             count_batches += 1
 
             epoch_loss += batch_loss
+            epoch_policy_loss += policy_loss.item()
+            epoch_value_loss += value_loss.item()
 
         epoch_loss /= max(1.0, count_batches)
+        epoch_policy_loss /= max(1.0, count_batches)
+        epoch_value_loss /= max(1.0, count_batches)
 
         if save_all_eval_checkpoints:
             save_fname = f"{model_id}_{curr_epoch_idx}.tar"
@@ -192,7 +197,10 @@ def main():
             logging.info(f"Saved checkpoint {curr_epoch_idx} after {count_batches} steps")
 
         writer.add_scalar("train_epoch/loss", epoch_loss, curr_epoch_idx)
-        logger.info(f"Epoch {curr_epoch_idx}: Loss {epoch_loss}")
+        writer.add_scalar("train_epoch/policy_loss", epoch_policy_loss, curr_epoch_idx)
+        writer.add_scalar("train_epoch/value_loss", epoch_value_loss, curr_epoch_idx)
+        logger.info(f"Epoch {curr_epoch_idx}: Loss: {epoch_loss}, "
+                    f"Policy Loss: {epoch_policy_loss}, Value Loss: {epoch_value_loss}")
 
         curr_epoch_idx += 1
 
