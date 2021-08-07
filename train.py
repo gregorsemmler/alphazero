@@ -79,13 +79,13 @@ def main():
     model = CNNModel(input_shape, num_filters, num_residual_blocks, val_hidden_size, game.n_cols).to(device)
 
     replay_buffer_path = None
-    replay_buffer_path = "replay_buffers/replay_buffer_05082021_1641_200000"
+    replay_buffer_path = "replay_buffers/replay_buffer_06082021_2110_200000"
     # pretrained_model_path = "model_checkpoints/best/testrun1_03082021_161358_best_1.tar"
-    pretrained_model_path = "model_checkpoints/best/testrun1_05082021_054909_best_122.tar"
+    pretrained_model_path = "model_checkpoints/best/testrun1_06082021_060456_best_192.tar"
     # pretrained_model_path = None
     pretrained = pretrained_model_path is not None
 
-    replay_buffer_size = 200000
+    replay_buffer_size = 500000
 
     if isinstance(replay_buffer_path, str):
         with open(replay_buffer_path, "rb") as f:
@@ -107,8 +107,8 @@ def main():
     lr = 0.1
     momentum = 0.9
     l2_regularization = 1e-4
-    train_steps = 50
-    # train_steps = 1000
+    # train_steps = 50
+    train_steps = 200
     min_size_to_train = 5000
     save_all_eval_checkpoints = False
 

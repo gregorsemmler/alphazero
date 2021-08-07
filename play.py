@@ -27,7 +27,7 @@ def predict_with_model(game, model, state, device, show_hints=True):
 
 
 def play_against_model(num_mcts_searches=30, show_hints=True):
-    model_path = "model_checkpoints/best/testrun1_05082021_054909_best_112.tar"
+    model_path = "model_checkpoints/best/testrun1_07082021_054238_best_46.tar"
     model_id = basename(model_path)
     # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = torch.device("cpu")
@@ -75,7 +75,8 @@ def play_against_model(num_mcts_searches=30, show_hints=True):
             low_temp_probs = m.policy_value(state, 0)
             if show_hints:
                 print(f"Probabilities: {high_temp_probs}")
-                print(f"Suggested Action: {low_temp_probs.argmax()}")
+                if whose_turn == human_player:
+                    print(f"Suggested Action: {low_temp_probs.argmax()}")
 
             if whose_turn == human_player:
                 print(f"Your Turn (Pick a value between 0 and {game.num_actions})")
@@ -213,4 +214,4 @@ def play_against_model_without_mcts():
 
 
 if __name__ == "__main__":
-    play_against_model(num_mcts_searches=100, show_hints=False)
+    play_against_model(num_mcts_searches=100, show_hints=True)
