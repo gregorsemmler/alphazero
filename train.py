@@ -59,7 +59,7 @@ def main():
 
     checkpoint_path = "model_checkpoints"
     best_models_path = join(checkpoint_path, "best")
-    run_id = f"testrun1_{datetime.now():%d%m%Y_%H%M%S}"
+    run_id = f"train_steps_1000_{datetime.now():%d%m%Y_%H%M%S}"
     model_id = f"{run_id}"
     writer = SummaryWriter(comment=f"-{run_id}")
 
@@ -78,9 +78,9 @@ def main():
     val_hidden_size = 20
     model = CNNModel(input_shape, num_filters, num_residual_blocks, val_hidden_size, game.n_cols).to(device)
 
-    replay_buffer_path = None
-    replay_buffer_path = "replay_buffers/replay_buffer_07082021_1212_284171"
-    pretrained_model_path = "model_checkpoints/best/testrun1_07082021_054238_best_66.tar"
+    # replay_buffer_path = None
+    replay_buffer_path = "replay_buffers/replay_buffer_08082021_0623_371321"
+    pretrained_model_path = "model_checkpoints/best/testrun1_08082021_053304_best_7.tar"
     # pretrained_model_path = None
     pretrained = pretrained_model_path is not None
 
@@ -107,7 +107,7 @@ def main():
     momentum = 0.9
     l2_regularization = 1e-4
     # train_steps = 50
-    train_steps = 200
+    train_steps = 1000
     min_size_to_train = 5000
     save_all_eval_checkpoints = False
 
@@ -180,9 +180,11 @@ def main():
             writer.add_scalar("train_batch/policy_loss", policy_loss.item(), curr_train_batch_idx)
             writer.add_scalar("train_batch/value_loss", value_loss.item(), curr_train_batch_idx)
 
+            best_model_log = f"Best Model Idx: {best_model_idx - 1} " if best_model_idx > 0 else ""
             logger.info(f"Epoch {curr_epoch_idx}: Training - "
-                        f"Best Model Idx: {best_model_idx} Batch: {curr_train_batch_idx}: Loss {batch_loss}, "
+                        f"{best_model_log}Batch: {curr_train_batch_idx}: Loss {batch_loss}, "
                         f"(Policy Loss: {policy_loss.item()}, Value Loss: {value_loss.item()})")
+
             curr_train_batch_idx += 1
             count_batches += 1
 
