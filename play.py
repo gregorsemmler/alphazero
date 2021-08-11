@@ -27,10 +27,11 @@ def predict_with_model(game, model, state, device, show_hints=True):
 
 
 def play_against_model(num_mcts_searches=30, show_hints=True):
-    model_path = "model_checkpoints/best/testrun1_07082021_054238_best_46.tar"
+    # model_path = "model_checkpoints/best/testrun1_04082021_151335_best_7.tar"
+    model_path = "model_checkpoints/best/train_steps_1000_08082021_062521_best_91.tar"
     model_id = basename(model_path)
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    device = torch.device("cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cpu")
 
     n_rows, n_cols, n_to_win = 6, 7, 4
     game = ConnectNGame(n_rows, n_cols, n_to_win)
@@ -40,11 +41,11 @@ def play_against_model(num_mcts_searches=30, show_hints=True):
     num_residual_blocks = 3
     val_hidden_size = 20
 
-    model = CNNModel(input_shape, num_filters, num_residual_blocks, val_hidden_size, game.n_cols)
+    model = CNNModel(input_shape, num_filters, num_residual_blocks, val_hidden_size, game.n_cols).to(device)
     load_checkpoint(model_path, model, device=device)
     model.eval()
 
-    m = MonteCarloTreeSearch(model, game)
+    m = MonteCarloTreeSearch(model, game, device=device)
 
     print(f"Playing against {model_id}")
     print(f"Pick a color, {ConnectNGame.val_to_char(Player.FIRST_PLAYER.value)}={Player.FIRST_PLAYER.value}, "
@@ -214,4 +215,4 @@ def play_against_model_without_mcts():
 
 
 if __name__ == "__main__":
-    play_against_model(num_mcts_searches=100, show_hints=True)
+    play_against_model(num_mcts_searches=30, show_hints=True)
