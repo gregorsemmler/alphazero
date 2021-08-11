@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def tournament():
     logging.basicConfig(level=logging.INFO)
 
-    model_path = "model_checkpoints/best/tournament"
+    model_path = "model_checkpoints/best/tournament_09082021"
     model_name_filter = ""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     cpu = torch.device("cpu")
@@ -61,8 +61,10 @@ def tournament():
             n1, n2, n_draws = 0, 0, 0
 
             s = timer()
+            n_steps = 0
             for match_idx in range(num_matches):
-                r, _ = mcts1.play_match(num_eval_mcts_searches, lambda x: 0.0, other_mcts=mcts2)
+                r, m_steps = mcts1.play_match(num_eval_mcts_searches, lambda x: 0.0, other_mcts=mcts2)
+                n_steps += m_steps
 
                 if r > 0:
                     n1 += 1
@@ -85,8 +87,8 @@ def tournament():
                     n_draws += 1
 
             e = timer()
-            logger.info(f"{num_matches} matches between {model_name1} and {model_name2} steps took {e - s:.3f} seconds."
-                        f" Result: {n1}/{n2}/{n_draws}")
+            logger.info(f"{num_matches} matches between {model_name1} and {model_name2} with {n_steps} steps "
+                        f"took {e - s:.3f} seconds. Result: {n1}/{n2}/{n_draws}")
 
             m1.to(cpu)
             m2.to(cpu)
