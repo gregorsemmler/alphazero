@@ -4,8 +4,9 @@ import cv2 as cv
 from game import Player
 
 
-def show_im(im):
-    cv.imshow("im", im)
+def show_ims(*ims):
+    for im_idx, im in enumerate(ims):
+        cv.imshow(f"im {im_idx}", im)
     cv.waitKey()
     cv.destroyAllWindows()
 
@@ -39,7 +40,7 @@ def visualization_experiments():
         end_pt = ((prob_idx + 1) * prob_w, total_h-1)
         cv.rectangle(prob_img, start_pt, end_pt, prob_col, thickness=-1)
 
-    show_im(prob_img)
+    # prob_img2 = np.stack([prob_img[:, :, i] for i in range(prob_img.shape[-1])] + [alpha_prob], axis=-1)
 
     viz_img[:, :] = bg_color
     for c_idx in range(state_w):
@@ -60,7 +61,19 @@ def visualization_experiments():
 
             print("")
 
-    show_im(viz_img)
+    alpha_prob = np.zeros((total_h, total_w), dtype=np.uint8)
+    alpha_prob[:, :] = 255
+    alpha_prob[(prob_img == (255, 255, 255)).all(axis=2)] = 0
+
+    prob_viz_factor = 0.3
+    alpha2 = (alpha_prob / 255.0) * prob_viz_factor
+    alpha1 = 1.0 - alpha2
+
+    viz2 = viz_img.copy()
+    for c in range(3):
+        viz2[:, :, c] = alpha1 * viz_img[:, :, c] + alpha2 * prob_img[:, :, c]
+
+    show_ims(viz_img, viz2)
     print("")
     pass
 
