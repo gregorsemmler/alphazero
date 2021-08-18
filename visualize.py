@@ -30,20 +30,22 @@ def visualization_experiments():
     player2_color = (0, 0, 255)
     viz_img = np.zeros((total_h, total_w, 3), dtype=np.uint8)
 
+    print("")
+
+    limits = []
+
     prob_col = (0, 0, 255)  # TODO
     prob_img = np.zeros_like(viz_img)
     prob_img[:, :] = (255, 255, 255)
-    prob_w = total_w // state_w
     prob_hs = [int(pr * total_h) for pr in probs]
-    for prob_idx, prob_h in enumerate(prob_hs):
-        start_pt = (prob_idx * prob_w, total_h - prob_h)
-        end_pt = ((prob_idx + 1) * prob_w, total_h-1)
-        cv.rectangle(prob_img, start_pt, end_pt, prob_col, thickness=-1)
-
-    # prob_img2 = np.stack([prob_img[:, :, i] for i in range(prob_img.shape[-1])] + [alpha_prob], axis=-1)
 
     viz_img[:, :] = bg_color
+    prob_ws = []
+    previous_border = 0
+
     for c_idx in range(state_w):
+        center_x = margin + c_idx * (entry_size + margin) + entry_radius
+
         for r_idx in range(state_h):
             if state[r_idx, c_idx] == Player.NO_PLAYER.value:
                 col = no_player_color
@@ -52,14 +54,31 @@ def visualization_experiments():
             else:
                 col = player2_color
 
-            cv.circle(viz_img,
-                      (margin + c_idx * (entry_size + margin) + entry_radius,
-                       margin + r_idx * (entry_size + margin) + entry_radius),
-                      entry_radius, col, -1)
+            center_y = margin + r_idx * (entry_size + margin) + entry_radius
 
-            # show_im(viz_img)
+            cv.circle(viz_img, (center_x, center_y), entry_radius, col, -1)
 
-            print("")
+        next_border = center_x + entry_radius + margin // 2
+        limits.append((center_x - entry_radius - margin // 2, next_border))
+
+        if c_idx < state_w - 1:
+            cur_w = next_border - previous_border
+        else:
+            cur_w = total_w - previous_border
+        previous_border = next_border
+        prob_ws.append(cur_w)
+
+    print(sorted(limits, key=lambda x: x[0]))
+
+    last_x = 0
+    for prob_idx, (prob_w, prob_h) in enumerate(zip(prob_ws, prob_hs)):
+        next_x = last_x + prob_w
+        start_pt = (last_x, total_h - prob_h)
+        end_pt = (next_x, total_h-1)
+        last_x = next_x
+
+        print(f"{start_pt[0], end_pt[0]}")  # TODO test
+        cv.rectangle(prob_img, start_pt, end_pt, prob_col, thickness=-1)
 
     alpha_prob = np.zeros((total_h, total_w), dtype=np.uint8)
     alpha_prob[:, :] = 255
