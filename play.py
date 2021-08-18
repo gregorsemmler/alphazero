@@ -8,6 +8,7 @@ from game import ConnectNGame, Player, switch_player
 from mcts import MonteCarloTreeSearch
 from model import CNNModel
 from utils import load_checkpoint
+from visualize import visualize_connect_n_game
 
 
 def predict_with_model(game, model, state, device, show_hints=True):
@@ -26,7 +27,7 @@ def predict_with_model(game, model, state, device, show_hints=True):
     return values_np, prior_probs_np
 
 
-def play_against_model(num_mcts_searches=30, show_hints=True):
+def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=True):
     # model_path = "model_checkpoints/best/testrun1_04082021_151335_best_7.tar"
     model_path = "model_checkpoints/best/train_steps_1000_08082021_062521_best_91.tar"
     model_id = basename(model_path)
@@ -68,16 +69,21 @@ def play_against_model(num_mcts_searches=30, show_hints=True):
         while True:
             print("=" * 50)
             print("State")
-            game.render(state)
             predict_with_model(game, model, state, device, show_hints=show_hints)
 
             m.traverse_and_backup(num_mcts_searches, state, human_player)
             high_temp_probs = m.policy_value(state, 1)
             low_temp_probs = m.policy_value(state, 0)
+
             if show_hints:
                 print(f"Probabilities: {high_temp_probs}")
                 if whose_turn == human_player:
                     print(f"Suggested Action: {low_temp_probs.argmax()}")
+
+            if viz_with_image:
+                visualize_connect_n_game(state, high_temp_probs)
+            else:
+                game.render(state)
 
             if whose_turn == human_player:
                 print(f"Your Turn (Pick a value between 0 and {game.num_actions})")
@@ -125,7 +131,7 @@ def play_against_model(num_mcts_searches=30, show_hints=True):
     pass
 
 
-def play_against_model_without_mcts():
+def play_against_model_without_mcts(viz_with_image=True):
     # model_path = "model_checkpoints/best_old/testrun1_26072021_100008_best_93.tar"
     model_path = "model_checkpoints/best/testrun1_05082021_054909_best_53.tar"
     model_id = basename(model_path)
@@ -165,8 +171,14 @@ def play_against_model_without_mcts():
         while True:
             print("=" * 50)
             print("State")
-            game.render(state)
             values_np, prior_probs_np = predict_with_model(game, model, state, device)
+
+            if viz_with_image:
+                visualize_connect_n_game(state, prior_probs_np)
+            else:
+                game.render(state)
+
+            game.render(state)
 
             if whose_turn == human_player:
                 print(f"Your Turn (Pick a value between 0 and {game.num_actions})")

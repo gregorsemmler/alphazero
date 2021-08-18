@@ -15,6 +15,17 @@ def visualization_experiments():
     state_h, state_w = 6, 7
     state = np.random.randint(-1, 2, size=(state_h, state_w))
     probs = np.random.dirichlet([0.5] * state_h)
+    viz_im, viz_with_prob = draw_connect_n_state(state, probs)
+    show_ims(viz_im, viz_with_prob)
+
+
+def visualize_connect_n_game(state: np.ndarray, probs):
+    viz_im, viz_with_prob = draw_connect_n_state(state, probs)
+    show_ims(viz_with_prob)
+
+
+def draw_connect_n_state(state: np.ndarray, probs):
+    state_h, state_w = state.shape
 
     entry_size = 100
     entry_radius = entry_size // 2
@@ -24,20 +35,15 @@ def visualization_experiments():
 
     no_player_color = (255, 255, 255)
     bg_color = (84, 50, 20)
-    # player1_color = (49, 91, 94)
-    # player2_color = (33, 30, 83)
     player1_color = (0, 255, 255)
     player2_color = (0, 0, 255)
     viz_img = np.zeros((total_h, total_w, 3), dtype=np.uint8)
 
-    print("")
-
-    limits = []
-
-    prob_col = (0, 0, 255)  # TODO
+    prob_col = (0, 0, 255)
     prob_img = np.zeros_like(viz_img)
     prob_img[:, :] = (255, 255, 255)
     prob_hs = [int(pr * total_h) for pr in probs]
+    prob_viz_factor = 0.3
 
     viz_img[:, :] = bg_color
     prob_ws = []
@@ -59,7 +65,6 @@ def visualization_experiments():
             cv.circle(viz_img, (center_x, center_y), entry_radius, col, -1)
 
         next_border = center_x + entry_radius + margin // 2
-        limits.append((center_x - entry_radius - margin // 2, next_border))
 
         if c_idx < state_w - 1:
             cur_w = next_border - previous_border
@@ -68,8 +73,6 @@ def visualization_experiments():
         previous_border = next_border
         prob_ws.append(cur_w)
 
-    print(sorted(limits, key=lambda x: x[0]))
-
     last_x = 0
     for prob_idx, (prob_w, prob_h) in enumerate(zip(prob_ws, prob_hs)):
         next_x = last_x + prob_w
@@ -77,24 +80,20 @@ def visualization_experiments():
         end_pt = (next_x, total_h-1)
         last_x = next_x
 
-        print(f"{start_pt[0], end_pt[0]}")  # TODO test
         cv.rectangle(prob_img, start_pt, end_pt, prob_col, thickness=-1)
 
     alpha_prob = np.zeros((total_h, total_w), dtype=np.uint8)
     alpha_prob[:, :] = 255
     alpha_prob[(prob_img == (255, 255, 255)).all(axis=2)] = 0
 
-    prob_viz_factor = 0.3
     alpha2 = (alpha_prob / 255.0) * prob_viz_factor
     alpha1 = 1.0 - alpha2
 
-    viz2 = viz_img.copy()
+    viz_img_with_probs = viz_img.copy()
     for c in range(3):
-        viz2[:, :, c] = alpha1 * viz_img[:, :, c] + alpha2 * prob_img[:, :, c]
+        viz_img_with_probs[:, :, c] = alpha1 * viz_img[:, :, c] + alpha2 * prob_img[:, :, c]
 
-    show_ims(viz_img, viz2)
-    print("")
-    pass
+    return viz_img, viz_img_with_probs
 
 
 if __name__ == "__main__":
