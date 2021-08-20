@@ -258,8 +258,7 @@ def main():
 
     if save_rp_buffer_on_exit:
         makedirs(replay_buffers_save_path, exist_ok=True)
-        rp_save_path = join(replay_buffers_save_path,
-                            f"replay_buffer_{datetime.now():%d%m%Y_%H%M}_{len(replay_buffer)}")
+        rp_save_path = join(replay_buffers_save_path, f"rb__{model_id}__{len(replay_buffer)}")
         with open(rp_save_path, "wb+") as f:
             pickle.dump(replay_buffer, f)
 
