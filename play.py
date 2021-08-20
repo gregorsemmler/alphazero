@@ -37,7 +37,8 @@ def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=Tru
     n_rows, n_cols, n_to_win = 6, 7, 4
     game = ConnectNGame(n_rows, n_cols, n_to_win)
 
-    input_shape = (2, game.n_rows, game.n_cols)
+    num_input_states = 2
+    input_shape = (2 * num_input_states, game.n_rows, game.n_cols)
     num_filters = 64
     num_residual_blocks = 3
     val_hidden_size = 20
@@ -46,7 +47,7 @@ def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=Tru
     load_checkpoint(model_path, model, device=device)
     model.eval()
 
-    m = MonteCarloTreeSearch(model, game, device=device)
+    m = MonteCarloTreeSearch(model, game, num_input_states, device=device)
 
     print(f"Playing against {model_id}")
     print(f"Pick a color, {ConnectNGame.val_to_char(Player.FIRST_PLAYER.value)}={Player.FIRST_PLAYER.value}, "
@@ -141,7 +142,8 @@ def play_against_model_without_mcts(viz_with_image=True):
     n_rows, n_cols, n_to_win = 6, 7, 4
     game = ConnectNGame(n_rows, n_cols, n_to_win)
 
-    input_shape = (2, game.n_rows, game.n_cols)
+    num_input_states = 2
+    input_shape = (2 * num_input_states, game.n_rows, game.n_cols)
     num_filters = 64
     num_residual_blocks = 3
     val_hidden_size = 20

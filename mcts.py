@@ -1,3 +1,4 @@
+import uuid
 from math import sqrt
 
 import numpy as np
@@ -13,8 +14,8 @@ class TreeNode(object):
         self.state = state
         self.player = player
         self.value = value
-        self.states_visited = states_visited
-        self.actions_taken = actions_taken
+        self.states_visited = list(states_visited)
+        self.actions_taken = list(actions_taken)
 
     def __str__(self):
         return f"{self.state} - {self.player} - {self.states_visited} - {self.actions_taken}"
@@ -22,24 +23,27 @@ class TreeNode(object):
 
 class GameHistoryEntry(object):
 
-    def __init__(self, state, player, probs, value=None):
+    def __init__(self, game_id, state, state_idx, player, probs, value=None):
+        self.game_id = game_id
         self.state = state
+        self.state_idx = state_idx
         self.player = player
         self.probs = probs
         self.value = value
 
     def __str__(self):
-        return f"{self.state} - {self.player} - {self.probs} - {self.value}"
+        return f"{self.game_id} - {self.state} - {self.state_idx} - {self.player} - {self.probs} - {self.value}"
 
 
 class MonteCarloTreeSearch(object):
 
-    def __init__(self, model, game: Game, search_batch_size=8, c_puct=1.0, epsilon=0.25, alpha=0.03,
+    def __init__(self, model, game: Game, num_input_states=1, search_batch_size=8, c_puct=1.0, epsilon=0.25, alpha=0.03,
                  device=torch.device("cpu")):
         self.model = model
         self.game = game
         self.num_actions = game.num_actions
         self.search_batch_size = search_batch_size
+        self.num_input_states = num_input_states
         self.alpha = alpha
         self.epsilon = epsilon
         self.c_puct = c_puct
@@ -68,6 +72,8 @@ class MonteCarloTreeSearch(object):
         player = beginning_player
         step_idx = 0
         game_history = []
+        game_id = str(uuid.uuid4())
+        game_state_idx = 0
 
         mcts_d = {beginning_player: self, other_player: other_mcts}
         beginning_player_result = None
@@ -81,7 +87,8 @@ class MonteCarloTreeSearch(object):
             m: MonteCarloTreeSearch = mcts_d[player]
             m.traverse_and_backup(num_mcts_searches, state, player)
             probs = m.policy_value(state, tau)
-            game_history.append(GameHistoryEntry(state, player, probs))
+            game_history.append(GameHistoryEntry(game_id, state, game_state_idx, player, probs))
+            game_state_idx += 1
             action = np.random.choice(self.num_actions, p=probs)
             if action in m.game.invalid_actions(state):
                 raise RuntimeError("Impossible Action selected")
@@ -128,7 +135,8 @@ class MonteCarloTreeSearch(object):
 
             if len(planned) > 0:
                 # expand nodes:
-                model_in = torch.stack([self.game.state_to_tensor(el.state, device=self.device) for el in expand_queue])
+                model_in = torch.stack([self.game.states_to_tensor(
+                    el.states_visited + [el.state], self.num_input_states, device=self.device) for el in expand_queue])
 
                 with torch.no_grad():
                     log_probs_out, values_out = self.model(model_in)

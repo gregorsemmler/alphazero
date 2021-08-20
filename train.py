@@ -15,16 +15,17 @@ from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.tensorboard import SummaryWriter
 
 from game import ConnectNGame
-from mcts import MonteCarloTreeSearch
+from mcts import MonteCarloTreeSearch, GameHistoryEntry
 from model import CNNModel
 from utils import save_checkpoint, load_checkpoint, GracefulExit
 
 logger = logging.getLogger(__name__)
 
 
-def evaluate(game, model1, model2, num_mcts_searches, num_matches, device=torch.device("cpu")):
-    mcts1 = MonteCarloTreeSearch(model1, game, device=device)
-    mcts2 = MonteCarloTreeSearch(model2, game, device=device)
+def evaluate(game, model1, model2, num_mcts_searches, num_matches, num_input_states, device=torch.device("cpu")):
+
+    mcts1 = MonteCarloTreeSearch(model1, game, num_input_states=num_input_states, device=device)
+    mcts2 = MonteCarloTreeSearch(model2, game, num_input_states=num_input_states, device=device)
 
     n_wins1 = 0
 
@@ -54,12 +55,32 @@ def scheduler_step(scheduler, writer=None, log_idx=None, log_prefix=None):
         writer.add_scalar(f"{log_prefix}/lr", current_lr, log_idx)
 
 
+def get_state_list(rp_buffer, rp_idx, count):
+    if rp_idx < 0 or rp_idx >= len(rp_buffer):
+        raise ValueError(f"Index for replay buffer is out of range: {rp_idx}")
+
+    game_id = rp_buffer[rp_idx].game_id
+    new_idx = rp_idx
+    while True:
+        if new_idx <= 0:
+            break
+        if rp_idx - new_idx >= count - 1:
+            break
+
+        cur_game_id = rp_buffer[new_idx - 1].game_id
+
+        if cur_game_id != game_id:
+            break
+        new_idx -= 1
+    return [rp_buffer[ix] for ix in range(new_idx, rp_idx + 1)]
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
 
     checkpoint_path = "model_checkpoints"
     best_models_path = join(checkpoint_path, "best")
-    run_id = f"train_steps_1000_{datetime.now():%d%m%Y_%H%M%S}"
+    run_id = f"two_states_in_{datetime.now():%d%m%Y_%H%M%S}"
     model_id = f"{run_id}"
     writer = SummaryWriter(comment=f"-{run_id}")
 
@@ -72,16 +93,15 @@ def main():
     n_rows, n_cols, n_to_win = 6, 7, 4
     game = ConnectNGame(n_rows, n_cols, n_to_win)
 
-    input_shape = (2, game.n_rows, game.n_cols)
+    num_input_states = 2
+    input_shape = (2 * num_input_states, game.n_rows, game.n_cols)
     num_filters = 64
     num_residual_blocks = 3
     val_hidden_size = 20
     model = CNNModel(input_shape, num_filters, num_residual_blocks, val_hidden_size, game.n_cols).to(device)
 
-    # replay_buffer_path = None
-    replay_buffer_path = "replay_buffers/replay_buffer_08082021_0623_371321"
-    pretrained_model_path = "model_checkpoints/best/testrun1_08082021_053304_best_7.tar"
-    # pretrained_model_path = None
+    replay_buffer_path = None
+    pretrained_model_path = None
     pretrained = pretrained_model_path is not None
 
     replay_buffer_size = 500000
@@ -99,16 +119,16 @@ def main():
         logger.info(f"Loaded pretrained model from \"{pretrained_model_path}\".")
 
     best_model = deepcopy(model)
-    mcts = MonteCarloTreeSearch(best_model, game, device=device)
+    mcts = MonteCarloTreeSearch(best_model, game, num_input_states=num_input_states, device=device)
 
     best_win_ratio = 0.55
     batch_size = 256
     lr = 0.1
     momentum = 0.9
     l2_regularization = 1e-4
-    # train_steps = 50
-    train_steps = 1000
-    min_size_to_train = 5000
+    train_steps = 50
+    # min_size_to_train = 5000
+    min_size_to_train = 100 # TODO test
     save_all_eval_checkpoints = False
 
     def simple_tau_sched(x):
@@ -155,12 +175,24 @@ def main():
 
         model.train()
         for _ in range(train_steps):
-            batch_indices = np.random.choice(len(replay_buffer), size=batch_size, replace=False)
-            batch_samples = [replay_buffer[idx] for idx in batch_indices]
+            valid_start_idx = 0
+
+            while True:
+                cur_entry: GameHistoryEntry = replay_buffer[valid_start_idx]
+                if cur_entry.state_idx == 0:
+                    break
+                if valid_start_idx >= num_input_states - 1:
+                    break
+                valid_start_idx += 1
+
+            batch_indices = np.random.choice(range(valid_start_idx, len(replay_buffer)), size=batch_size, replace=False)
+            batch_samples = [get_state_list(replay_buffer, b_idx, num_input_states) for b_idx in batch_indices]
             states_t = torch.stack(
-                [mcts.game.state_to_tensor(el, device=device) for el in [e.state for e in batch_samples]])
-            vals_t = torch.tensor([e.value for e in batch_samples], device=device, dtype=torch.float32)
-            probs_t = torch.tensor([e.probs for e in batch_samples], device=device, dtype=torch.float32)
+                [mcts.game.states_to_tensor([e.state for e in lst], num_input_states, device=device) for lst in
+                 batch_samples])
+
+            vals_t = torch.tensor([lst[-1].value for lst in batch_samples], device=device, dtype=torch.float32)
+            probs_t = torch.tensor([lst[-1].probs for lst in batch_samples], device=device, dtype=torch.float32)
 
             log_probs_out, val_out = model(states_t)
 
@@ -209,7 +241,8 @@ def main():
 
         curr_epoch_idx += 1
 
-        win_ratio = evaluate(game, model, best_model, num_eval_mcts_searches, num_eval_games, device=device)
+        win_ratio = evaluate(game, model, best_model, num_eval_mcts_searches, num_eval_games, num_input_states,
+                             device=device)
         logger.info(f"Evaluation against best model, win ratio: {win_ratio}")
         writer.add_scalar("train_epoch/win_ratio", win_ratio, curr_epoch_idx)
         if win_ratio > best_win_ratio:

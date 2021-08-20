@@ -32,7 +32,7 @@ class Game(object):
     def move(self, state, action, player):
         raise NotImplementedError()
 
-    def state_to_tensor(self, state, device):
+    def states_to_tensor(self, states, count, device):
         raise NotImplementedError()
 
     def render(self, state):
@@ -145,14 +145,22 @@ class ConnectNGame(Game):
         lines.extend([index_line, sep_line])
         return "\n".join(lines)
 
-    def state_to_tensor(self, state, device):
-        result = torch.zeros(2, self.n_rows, self.n_cols, device=device)
-        for r_idx in range(self.n_rows):
-            for c_idx in range(self.n_cols):
-                if state[r_idx, c_idx] == Player.FIRST_PLAYER.value:
-                    result[0, r_idx, c_idx] = 1
-                elif state[r_idx, c_idx] == Player.SECOND_PLAYER.value:
-                    result[1, r_idx, c_idx] = 1
+    def states_to_tensor(self, states, count, device):
+        result = torch.zeros(2 * count, self.n_rows, self.n_cols, device=device)
+        cur_index = 2 * count - 1
+        for state in reversed(states):
+            if cur_index < 1:
+                break
+
+            for r_idx in range(self.n_rows):
+                for c_idx in range(self.n_cols):
+                    if state[r_idx, c_idx] == Player.FIRST_PLAYER.value:
+                        result[cur_index - 1, r_idx, c_idx] = 1
+                    elif state[r_idx, c_idx] == Player.SECOND_PLAYER.value:
+                        result[cur_index, r_idx, c_idx] = 1
+
+            cur_index -= 2
+
         return result
 
     def render(self, state):

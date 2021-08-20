@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def tournament():
     logging.basicConfig(level=logging.INFO)
 
-    model_path = "model_checkpoints/best/tournament_09082021"
+    model_path = "model_checkpoints/best/test_tournament_2008"
     model_name_filter = ""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     cpu = torch.device("cpu")
@@ -27,7 +27,8 @@ def tournament():
     n_rows, n_cols, n_to_win = 6, 7, 4
     game = ConnectNGame(n_rows, n_cols, n_to_win)
 
-    input_shape = (2, game.n_rows, game.n_cols)
+    num_input_states = 2
+    input_shape = (2 * num_input_states, game.n_rows, game.n_cols)
     num_filters = 64
     num_residual_blocks = 3
     val_hidden_size = 20
@@ -55,8 +56,8 @@ def tournament():
             m1.to(device)
             m2.to(device)
 
-            mcts1 = MonteCarloTreeSearch(m1, game, device=device)
-            mcts2 = MonteCarloTreeSearch(m2, game, device=device)
+            mcts1 = MonteCarloTreeSearch(m1, game, num_input_states, device=device)
+            mcts2 = MonteCarloTreeSearch(m2, game, num_input_states, device=device)
 
             n1, n2, n_draws = 0, 0, 0
 
