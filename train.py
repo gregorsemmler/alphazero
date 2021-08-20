@@ -126,9 +126,8 @@ def main():
     lr = 0.1
     momentum = 0.9
     l2_regularization = 1e-4
-    train_steps = 50
-    # min_size_to_train = 5000
-    min_size_to_train = 100 # TODO test
+    train_steps = 100
+    min_size_to_train = 5000
     save_all_eval_checkpoints = False
 
     def simple_tau_sched(x):
