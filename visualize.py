@@ -6,7 +6,7 @@ from game import Player
 
 def show_ims(*ims):
     for im_idx, im in enumerate(ims):
-        cv.imshow(f"im {im_idx}", im)
+        cv.imshow(f"{im_idx}", im)
     cv.waitKey()
     cv.destroyAllWindows()
 
@@ -39,11 +39,12 @@ def draw_connect_n_state(state: np.ndarray, probs):
     player2_color = (0, 0, 255)
     viz_img = np.zeros((total_h, total_w, 3), dtype=np.uint8)
 
-    prob_col = (0, 0, 255)
+    # prob_col = (0, 0, 255)
+    prob_col = (104, 172, 84)
     prob_img = np.zeros_like(viz_img)
     prob_img[:, :] = (255, 255, 255)
     prob_hs = [int(pr * total_h) for pr in probs]
-    prob_viz_factor = 0.3
+    prob_viz_factor = 0.5
 
     viz_img[:, :] = bg_color
     prob_ws = []

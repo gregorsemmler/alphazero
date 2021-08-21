@@ -1,3 +1,4 @@
+from collections import deque
 from os.path import basename
 
 import numpy as np
@@ -11,8 +12,8 @@ from utils import load_checkpoint
 from visualize import visualize_connect_n_game
 
 
-def predict_with_model(game, model, state, device, show_hints=True):
-    model_in = game.state_to_tensor(state, device=device).unsqueeze(0)
+def predict_with_model(game, model, states, num_input_states, device, show_hints=True):
+    model_in = game.states_to_tensor(states, num_input_states, device=device).unsqueeze(0)
 
     with torch.no_grad():
         log_probs_out, values_out = model(model_in)
@@ -28,11 +29,9 @@ def predict_with_model(game, model, state, device, show_hints=True):
 
 
 def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=True):
-    # model_path = "model_checkpoints/best/testrun1_04082021_151335_best_7.tar"
-    model_path = "model_checkpoints/best/train_steps_1000_08082021_062521_best_91.tar"
+    model_path = "model_checkpoints/best/two_states_in_21082021_053954_best_104.tar"
     model_id = basename(model_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # device = torch.device("cpu")
 
     n_rows, n_cols, n_to_win = 6, 7, 4
     game = ConnectNGame(n_rows, n_cols, n_to_win)
@@ -66,11 +65,12 @@ def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=Tru
     while True:
         whose_turn = np.random.choice([human_player, model_player])
         state = game.initial_state()
+        last_states = deque([state], maxlen=num_input_states)
 
         while True:
             print("=" * 50)
             print("State")
-            predict_with_model(game, model, state, device, show_hints=show_hints)
+            predict_with_model(game, model, last_states, num_input_states, device, show_hints=show_hints)
 
             m.traverse_and_backup(num_mcts_searches, state, human_player)
             high_temp_probs = m.policy_value(state, 1)
@@ -81,10 +81,10 @@ def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=Tru
                 if whose_turn == human_player:
                     print(f"Suggested Action: {low_temp_probs.argmax()}")
 
+            game.render(state)
             if viz_with_image:
-                visualize_connect_n_game(state, high_temp_probs)
-            else:
-                game.render(state)
+                show_probs = high_temp_probs if show_hints else np.zeros_like(high_temp_probs)
+                visualize_connect_n_game(state, show_probs)
 
             if whose_turn == human_player:
                 print(f"Your Turn (Pick a value between 0 and {game.num_actions})")
@@ -99,6 +99,7 @@ def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=Tru
                         human_action_taken = True
 
                 state, won = game.move(state, human_action, human_player)
+                last_states.append(state)
 
                 if won:
                     print("You won, congratulations")
@@ -114,6 +115,7 @@ def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=Tru
                 probs = m.policy_value(state, 0)
                 model_action = np.random.choice(m.num_actions, p=probs)
                 state, won = game.move(state, model_action, model_player)
+                last_states.append(state)
 
                 print(f"I chose action {model_action}")
 
@@ -132,12 +134,11 @@ def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=Tru
     pass
 
 
-def play_against_model_without_mcts(viz_with_image=True):
-    # model_path = "model_checkpoints/best_old/testrun1_26072021_100008_best_93.tar"
-    model_path = "model_checkpoints/best/testrun1_05082021_054909_best_53.tar"
+def play_against_model_without_mcts(viz_with_image=True, show_hints=True):
+    model_path = "model_checkpoints/best/two_states_in_21082021_053954_best_102.tar"
     model_id = basename(model_path)
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    device = torch.device("cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cpu")
 
     n_rows, n_cols, n_to_win = 6, 7, 4
     game = ConnectNGame(n_rows, n_cols, n_to_win)
@@ -148,7 +149,7 @@ def play_against_model_without_mcts(viz_with_image=True):
     num_residual_blocks = 3
     val_hidden_size = 20
 
-    model = CNNModel(input_shape, num_filters, num_residual_blocks, val_hidden_size, game.n_cols)
+    model = CNNModel(input_shape, num_filters, num_residual_blocks, val_hidden_size, game.n_cols).to(device)
     load_checkpoint(model_path, model, device=device)
     model.eval()
 
@@ -169,18 +170,18 @@ def play_against_model_without_mcts(viz_with_image=True):
     while True:
         whose_turn = np.random.choice([human_player, model_player])
         state = game.initial_state()
+        last_states = deque([state], maxlen=num_input_states)
 
         while True:
             print("=" * 50)
             print("State")
-            values_np, prior_probs_np = predict_with_model(game, model, state, device)
-
-            if viz_with_image:
-                visualize_connect_n_game(state, prior_probs_np)
-            else:
-                game.render(state)
+            values_np, prior_probs_np = predict_with_model(game, model, last_states, num_input_states, device)
 
             game.render(state)
+
+            if viz_with_image:
+                show_probs = prior_probs_np if show_hints else np.zeros_like(prior_probs_np)
+                visualize_connect_n_game(state, show_probs)
 
             if whose_turn == human_player:
                 print(f"Your Turn (Pick a value between 0 and {game.num_actions})")
@@ -195,6 +196,7 @@ def play_against_model_without_mcts(viz_with_image=True):
                         human_action_taken = True
 
                 state, won = game.move(state, human_action, human_player)
+                last_states.append(state)
 
                 if won:
                     print("You won, congratulations")
@@ -210,6 +212,7 @@ def play_against_model_without_mcts(viz_with_image=True):
 
                 model_action = prior_probs_np.argmax()
                 state, won = game.move(state, model_action, model_player)
+                last_states.append(state)
 
                 print(f"I chose action {model_action}")
 
@@ -229,4 +232,5 @@ def play_against_model_without_mcts(viz_with_image=True):
 
 
 if __name__ == "__main__":
-    play_against_model(num_mcts_searches=30, show_hints=True)
+    # play_against_model(num_mcts_searches=30, show_hints=True)
+    play_against_model_without_mcts()
