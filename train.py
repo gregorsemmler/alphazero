@@ -100,8 +100,10 @@ def main():
     val_hidden_size = 20
     model = CNNModel(input_shape, num_filters, num_residual_blocks, val_hidden_size, game.n_cols).to(device)
 
-    replay_buffer_path = None
-    pretrained_model_path = None
+    # replay_buffer_path = None
+    # pretrained_model_path = None
+    replay_buffer_path = "replay_buffers/rb__two_states_in_21082021_053954__218485"
+    pretrained_model_path = "model_checkpoints/best/two_states_in_21082021_053954_best_126.tar"
     pretrained = pretrained_model_path is not None
 
     replay_buffer_size = 500000
@@ -146,6 +148,8 @@ def main():
     curr_epoch_idx = 0
     curr_train_batch_idx = 0
     best_model_idx = 0
+    n_total_train_games = 0
+    n_total_eval_games = 0
 
     graceful_exit = GracefulExit()
     save_rp_buffer_on_exit = True
@@ -161,6 +165,10 @@ def main():
             logger.info(f"Epoch {curr_epoch_idx}: Match {game_idx} "
                         f"with {m_steps} steps took {m_t:.3f} seconds ({m_steps / m_t:.3f} steps/s). "
                         f"Replay Buffer Size: {len(replay_buffer)}")
+
+        n_total_train_games += num_games_played
+        writer.add_scalar("epoch/games_played", n_total_train_games, curr_epoch_idx)
+        writer.add_scalar("epoch/replay_buffer_size", len(replay_buffer), curr_epoch_idx)
 
         if len(replay_buffer) < min_size_to_train:
             logger.info(f"Epoch {curr_epoch_idx}: Minimum replay buffer size "
@@ -207,9 +215,9 @@ def main():
             scheduler_step(scheduler, writer, curr_train_batch_idx, "batch")  # Batchwise scheduler in this case
 
             batch_loss = loss.item()
-            writer.add_scalar("train_batch/loss", batch_loss, curr_train_batch_idx)
-            writer.add_scalar("train_batch/policy_loss", policy_loss.item(), curr_train_batch_idx)
-            writer.add_scalar("train_batch/value_loss", value_loss.item(), curr_train_batch_idx)
+            writer.add_scalar("batch/loss", batch_loss, curr_train_batch_idx)
+            writer.add_scalar("batch/policy_loss", policy_loss.item(), curr_train_batch_idx)
+            writer.add_scalar("batch/value_loss", value_loss.item(), curr_train_batch_idx)
 
             best_model_log = f"Best Model Idx: {best_model_idx - 1} " if best_model_idx > 0 else ""
             logger.info(f"Epoch {curr_epoch_idx}: Training - "
@@ -232,9 +240,9 @@ def main():
             save_checkpoint(join(checkpoint_path, save_fname), model, model_id=curr_epoch_idx)
             logging.info(f"Saved checkpoint {curr_epoch_idx} after {count_batches} steps")
 
-        writer.add_scalar("train_epoch/loss", epoch_loss, curr_epoch_idx)
-        writer.add_scalar("train_epoch/policy_loss", epoch_policy_loss, curr_epoch_idx)
-        writer.add_scalar("train_epoch/value_loss", epoch_value_loss, curr_epoch_idx)
+        writer.add_scalar("epoch/loss", epoch_loss, curr_epoch_idx)
+        writer.add_scalar("epoch/policy_loss", epoch_policy_loss, curr_epoch_idx)
+        writer.add_scalar("epoch/value_loss", epoch_value_loss, curr_epoch_idx)
         logger.info(f"Epoch {curr_epoch_idx}: Loss: {epoch_loss}, "
                     f"Policy Loss: {epoch_policy_loss}, Value Loss: {epoch_value_loss}")
 
@@ -242,8 +250,12 @@ def main():
 
         win_ratio = evaluate(game, model, best_model, num_eval_mcts_searches, num_eval_games, num_input_states,
                              device=device)
+
+        n_total_eval_games += num_eval_games
+        writer.add_scalar("epoch/eval_games", n_total_eval_games, curr_epoch_idx)
+
         logger.info(f"Evaluation against best model, win ratio: {win_ratio}")
-        writer.add_scalar("train_epoch/win_ratio", win_ratio, curr_epoch_idx)
+        writer.add_scalar("epoch/win_ratio", win_ratio, curr_epoch_idx)
         if win_ratio > best_win_ratio:
             best_model.load_state_dict(model.state_dict())
             best_fname = f"{model_id}_best_{best_model_idx}.tar"
