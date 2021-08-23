@@ -12,6 +12,9 @@ from utils import load_checkpoint
 from visualize import visualize_connect_n_game
 
 
+OPENCV_KEY_CODES = {48: 0, 49: 1, 50: 2, 51: 3, 52: 4, 53: 5, 54: 6}
+
+
 def predict_with_model(game, model, states, num_input_states, device, show_hints=True):
     model_in = game.states_to_tensor(states, num_input_states, device=device).unsqueeze(0)
 
@@ -29,7 +32,7 @@ def predict_with_model(game, model, states, num_input_states, device, show_hints
 
 
 def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=True):
-    model_path = "model_checkpoints/best/two_states_in_21082021_053954_best_104.tar"
+    model_path = "model_checkpoints/best/two_states_in_23082021_064321_best_86.tar"
     model_id = basename(model_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -81,22 +84,31 @@ def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=Tru
                 if whose_turn == human_player:
                     print(f"Suggested Action: {low_temp_probs.argmax()}")
 
+            if whose_turn == human_player:
+                print("Your Turn")
+            else:
+                print("My turn.")
+
             game.render(state)
+            human_action = None
             if viz_with_image:
                 show_probs = high_temp_probs if show_hints else np.zeros_like(high_temp_probs)
-                visualize_connect_n_game(state, show_probs)
+                k = visualize_connect_n_game(state, show_probs)
+                if k in OPENCV_KEY_CODES:
+                    human_action = OPENCV_KEY_CODES[k]
 
             if whose_turn == human_player:
-                print(f"Your Turn (Pick a value between 0 and {game.num_actions})")
-                human_action_taken = False
+                if human_action is None:
+                    print(f"Pick an action (Pick a value between 0 and {game.num_actions})")
+                    human_action_taken = False
 
-                human_action = None
-                while not human_action_taken:
-                    human_action = int(input())
-                    if human_action in game.invalid_actions(state):
-                        print("This is not a valid action.")
-                    else:
-                        human_action_taken = True
+                    while not human_action_taken:
+                        human_action = int(input())
+                        if human_action in game.invalid_actions(state):
+                            print("This is not a valid action.")
+                        else:
+                            human_action_taken = True
+                print(f"You chose action {human_action}")
 
                 state, won = game.move(state, human_action, human_player)
                 last_states.append(state)
@@ -110,8 +122,6 @@ def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=Tru
                     break
 
             else:
-                print("My Turn")
-
                 probs = m.policy_value(state, 0)
                 model_action = np.random.choice(m.num_actions, p=probs)
                 state, won = game.move(state, model_action, model_player)
@@ -177,23 +187,35 @@ def play_against_model_without_mcts(viz_with_image=True, show_hints=True):
             print("State")
             values_np, prior_probs_np = predict_with_model(game, model, last_states, num_input_states, device)
 
-            game.render(state)
+            if whose_turn == human_player:
+                print("Your Turn")
+            else:
+                print("My turn.")
 
+            game.render(state)
+            human_action = None
             if viz_with_image:
                 show_probs = prior_probs_np if show_hints else np.zeros_like(prior_probs_np)
-                visualize_connect_n_game(state, show_probs)
+                k = visualize_connect_n_game(state, show_probs)
+                if k in OPENCV_KEY_CODES:
+                    human_action = OPENCV_KEY_CODES[k]
+
+            game.render(state)
 
             if whose_turn == human_player:
-                print(f"Your Turn (Pick a value between 0 and {game.num_actions})")
-                human_action_taken = False
 
-                human_action = None
-                while not human_action_taken:
-                    human_action = int(input())
-                    if human_action in game.invalid_actions(state):
-                        print("This is not a valid action.")
-                    else:
-                        human_action_taken = True
+                if human_action is None:
+                    print(f"Your Action (Pick a value between 0 and {game.num_actions})")
+                    human_action_taken = False
+
+                    human_action = None
+                    while not human_action_taken:
+                        human_action = int(input())
+                        if human_action in game.invalid_actions(state):
+                            print("This is not a valid action.")
+                        else:
+                            human_action_taken = True
+                print(f"You chose action {human_action}")
 
                 state, won = game.move(state, human_action, human_player)
                 last_states.append(state)
@@ -208,7 +230,6 @@ def play_against_model_without_mcts(viz_with_image=True, show_hints=True):
 
             else:
                 # Play without MCTS here
-                print("My Turn")
 
                 model_action = prior_probs_np.argmax()
                 state, won = game.move(state, model_action, model_player)
@@ -232,5 +253,5 @@ def play_against_model_without_mcts(viz_with_image=True, show_hints=True):
 
 
 if __name__ == "__main__":
-    # play_against_model(num_mcts_searches=30, show_hints=True)
-    play_against_model_without_mcts()
+    # play_against_model(num_mcts_searches=100, show_hints=True)
+    play_against_model_without_mcts(show_hints=True)

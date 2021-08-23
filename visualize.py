@@ -7,8 +7,9 @@ from game import Player
 def show_ims(*ims):
     for im_idx, im in enumerate(ims):
         cv.imshow(f"{im_idx}", im)
-    cv.waitKey()
+    k = cv.waitKey()
     cv.destroyAllWindows()
+    return k
 
 
 def visualization_experiments():
@@ -21,7 +22,7 @@ def visualization_experiments():
 
 def visualize_connect_n_game(state: np.ndarray, probs):
     viz_im, viz_with_prob = draw_connect_n_state(state, probs)
-    show_ims(viz_with_prob)
+    return show_ims(viz_with_prob)
 
 
 def draw_connect_n_state(state: np.ndarray, probs):

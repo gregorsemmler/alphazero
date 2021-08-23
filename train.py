@@ -102,8 +102,8 @@ def main():
 
     # replay_buffer_path = None
     # pretrained_model_path = None
-    replay_buffer_path = "replay_buffers/rb__two_states_in_21082021_053954__218485"
-    pretrained_model_path = "model_checkpoints/best/two_states_in_21082021_053954_best_126.tar"
+    replay_buffer_path = "replay_buffers/rb__two_states_in_22082021_074641__500000"
+    pretrained_model_path = "model_checkpoints/best/two_states_in_22082021_074641_best_168.tar"
     pretrained = pretrained_model_path is not None
 
     replay_buffer_size = 500000
