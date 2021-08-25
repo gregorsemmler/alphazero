@@ -1,5 +1,5 @@
-import numpy as np
 import cv2 as cv
+import numpy as np
 
 from game import Player
 
@@ -20,13 +20,16 @@ def visualization_experiments():
     show_ims(viz_im, viz_with_prob)
 
 
-def visualize_connect_n_game(state: np.ndarray, probs):
-    viz_im, viz_with_prob = draw_connect_n_state(state, probs)
+def visualize_connect_n_game(state: np.ndarray, probs=None):
+    viz_im, viz_with_prob = draw_connect_n_state(state, probs=probs)
     return show_ims(viz_with_prob)
 
 
-def draw_connect_n_state(state: np.ndarray, probs):
+def draw_connect_n_state(state: np.ndarray, probs=None):
     state_h, state_w = state.shape
+
+    if probs is None:
+        probs = [0.0] * state_w
 
     entry_size = 100
     entry_radius = entry_size // 2

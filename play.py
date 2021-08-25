@@ -32,7 +32,7 @@ def predict_with_model(game, model, states, num_input_states, device, show_hints
 
 
 def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=True):
-    model_path = "model_checkpoints/best/two_states_in_23082021_064321_best_68.tar"
+    model_path = "model_checkpoints/example_model.tar"
     model_id = basename(model_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -92,7 +92,7 @@ def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=Tru
             game.render(state)
             human_action = None
             if viz_with_image:
-                show_probs = high_temp_probs if show_hints else np.zeros_like(high_temp_probs)
+                show_probs = high_temp_probs if show_hints else None
                 k = visualize_connect_n_game(state, show_probs)
                 if k in OPENCV_KEY_CODES:
                     human_action = OPENCV_KEY_CODES[k]
@@ -141,7 +141,7 @@ def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=Tru
 
         game.render(state)
         if viz_with_image:
-            visualize_connect_n_game(state, [0.0] * game.num_actions)
+            visualize_connect_n_game(state)
 
         print("New Game")
 
@@ -149,7 +149,7 @@ def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=Tru
 
 
 def play_against_model_without_mcts(viz_with_image=True, show_hints=True):
-    model_path = "model_checkpoints/best/two_states_in_21082021_053954_best_102.tar"
+    model_path = "model_checkpoints/example_model.tar"
     model_id = basename(model_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # device = torch.device("cpu")
@@ -199,7 +199,7 @@ def play_against_model_without_mcts(viz_with_image=True, show_hints=True):
             game.render(state)
             human_action = None
             if viz_with_image:
-                show_probs = prior_probs_np if show_hints else np.zeros_like(prior_probs_np)
+                show_probs = prior_probs_np if show_hints else None
                 k = visualize_connect_n_game(state, show_probs)
                 if k in OPENCV_KEY_CODES:
                     human_action = OPENCV_KEY_CODES[k]
@@ -234,7 +234,6 @@ def play_against_model_without_mcts(viz_with_image=True, show_hints=True):
 
             else:
                 # Play without MCTS here
-
                 model_action = prior_probs_np.argmax()
                 state, won = game.move(state, model_action, model_player)
                 last_states.append(state)
@@ -253,14 +252,13 @@ def play_against_model_without_mcts(viz_with_image=True, show_hints=True):
 
         game.render(state)
         if viz_with_image:
-            visualize_connect_n_game(state, [0.0] * game.num_actions)
+            visualize_connect_n_game(state)
 
         print("New Game")
-
 
     pass
 
 
 if __name__ == "__main__":
-    play_against_model(num_mcts_searches=100, show_hints=False)
+    play_against_model(num_mcts_searches=100, show_hints=True)
     # play_against_model_without_mcts(show_hints=True)
