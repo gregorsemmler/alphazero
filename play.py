@@ -32,7 +32,7 @@ def predict_with_model(game, model, states, num_input_states, device, show_hints
 
 
 def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=True):
-    model_path = "model_checkpoints/best/two_states_in_23082021_064321_best_86.tar"
+    model_path = "model_checkpoints/best/two_states_in_23082021_064321_best_68.tar"
     model_id = basename(model_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -138,6 +138,10 @@ def play_against_model(num_mcts_searches=30, show_hints=True, viz_with_image=Tru
                     break
 
             whose_turn = human_player if whose_turn == model_player else model_player
+
+        game.render(state)
+        if viz_with_image:
+            visualize_connect_n_game(state, [0.0] * game.num_actions)
 
         print("New Game")
 
@@ -247,11 +251,16 @@ def play_against_model_without_mcts(viz_with_image=True, show_hints=True):
 
             whose_turn = human_player if whose_turn == model_player else model_player
 
+        game.render(state)
+        if viz_with_image:
+            visualize_connect_n_game(state, [0.0] * game.num_actions)
+
         print("New Game")
+
 
     pass
 
 
 if __name__ == "__main__":
-    # play_against_model(num_mcts_searches=100, show_hints=True)
-    play_against_model_without_mcts(show_hints=True)
+    play_against_model(num_mcts_searches=100, show_hints=False)
+    # play_against_model_without_mcts(show_hints=True)
