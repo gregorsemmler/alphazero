@@ -17,8 +17,6 @@ logger = logging.getLogger(__name__)
 
 def tournament():
     logging.basicConfig(level=logging.INFO)
-
-    # model_path = "model_checkpoints/best/tournament_23082021_1"
     model_path = "model_checkpoints/best/tournament_24082021_r2_1"
     model_name_filter = ""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

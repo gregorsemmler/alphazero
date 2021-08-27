@@ -260,5 +260,5 @@ def play_against_model_without_mcts(viz_with_image=True, show_hints=True):
 
 
 if __name__ == "__main__":
-    play_against_model(num_mcts_searches=100, show_hints=True)
+    play_against_model(num_mcts_searches=10, show_hints=True)
     # play_against_model_without_mcts(show_hints=True)

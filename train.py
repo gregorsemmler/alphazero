@@ -100,10 +100,8 @@ def main():
     val_hidden_size = 20
     model = CNNModel(input_shape, num_filters, num_residual_blocks, val_hidden_size, game.n_cols).to(device)
 
-    # replay_buffer_path = None
-    # pretrained_model_path = None
-    replay_buffer_path = "replay_buffers/rb__two_states_in_22082021_074641__500000"
-    pretrained_model_path = "model_checkpoints/best/two_states_in_22082021_074641_best_168.tar"
+    replay_buffer_path = None
+    pretrained_model_path = None
     pretrained = pretrained_model_path is not None
 
     replay_buffer_size = 500000
